@@ -2,6 +2,6 @@ package core
 
 // Интерфейс для шифровщиков данных
 type Encryptor interface {
-	Encrypy()
+	Encrypt()
 	Decrypt()
 }
