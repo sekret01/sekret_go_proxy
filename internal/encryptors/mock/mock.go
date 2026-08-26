@@ -9,9 +9,13 @@ import (
 // Заглушка, для быстрой проверки логики работы системы
 type MockEncryptor struct{}
 
-func (m *MockEncryptor) Encrypt() {}
+func (m *MockEncryptor) Encrypt(data []byte) []byte {
+	return data
+}
 
-func (m *MockEncryptor) Decrypt() {}
+func (m *MockEncryptor) Decrypt(data []byte) []byte {
+	return data
+}
 
 func NewMockCrypto(config config.Config) (core.Encryptor, error) {
 	return &MockEncryptor{}, nil
