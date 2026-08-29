@@ -5,6 +5,8 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/detectors"
+	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -27,13 +29,16 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	transport, err := transports.NewTransport(cfg)
 	buildSuccess = isContinue(err)
 	framer, err := framers.NewFramer(cfg)
+	buildSuccess = isContinue(err)
+	dispatcher := dispatchers.NewDispatcher()
+	detector := detectors.NewDetector()
 
 	if !buildSuccess {
 		fmt.Printf("Errors in building moduls, stop program\n")
 		return nil, core.ErrBuildClientApp
 	}
 
-	tunnel := proxy.NewClientTunnel(transport, encryptor, framer, nil, nil)
+	tunnel := proxy.NewClientTunnel(transport, encryptor, framer, dispatcher, detector)
 	return &ClientApp{
 		tunnel: *tunnel,
 	}, nil
