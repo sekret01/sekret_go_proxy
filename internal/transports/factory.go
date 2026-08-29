@@ -22,7 +22,7 @@ func Registrate(key string, factory FactoryFunc) {
 		panic("Transport [" + key + "] already exists")
 	}
 	transportsMap[key] = factory
-	fmt.Printf("Transport [%s] has been registrated", key)
+	fmt.Printf("Transport [%s] has been registrated\n", key)
 }
 
 func List() []string {

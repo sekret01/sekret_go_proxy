@@ -17,7 +17,7 @@ func (m *MockEncryptor) Decrypt(data []byte) []byte {
 	return data
 }
 
-func NewMockCrypto(config config.Config) (core.Encryptor, error) {
+func NewMockCrypto(config *config.Config) (core.Encryptor, error) {
 	return &MockEncryptor{}, nil
 }
 

@@ -7,4 +7,5 @@ type Config struct {
 	RemotePort int    `yaml:"remoteport"`
 
 	TransportType string `yaml:"transport_type"`
+	EncryptorType string `yaml:"encryptor_type"`
 }
