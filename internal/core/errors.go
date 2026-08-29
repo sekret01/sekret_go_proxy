@@ -11,4 +11,7 @@ var (
 	ErrInvalidFramerKey    = errors.New("Framer with key not found")
 
 	ErrBuildClientApp = errors.New("Error building ClientApp modules")
+
+	ErrInsufficientHeaderLensth  = errors.New("Insufficient length to read the header")
+	ErrInsufficientPayloadLensth = errors.New("Insufficient length to read payload")
 )

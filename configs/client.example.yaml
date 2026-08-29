@@ -5,4 +5,4 @@ remoteport: 32658
 
 transport_type: tcp
 encryptor_type: mock
-framer_type: noop
+framer_type: simple

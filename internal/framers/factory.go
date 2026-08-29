@@ -7,7 +7,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-type FactoryFunc func() (core.Framer, error)
+type FactoryFunc func(*config.Config) (core.Framer, error)
 
 var (
 	framesMap = make(map[string]FactoryFunc)
@@ -38,5 +38,5 @@ func NewFramer(cfg *config.Config) (core.Framer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return factory()
+	return factory(cfg)
 }
