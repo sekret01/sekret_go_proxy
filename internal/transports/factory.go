@@ -25,6 +25,14 @@ func Registrate(key string, factory FactoryFunc) {
 	fmt.Printf("Transport [%s] has been registrated", key)
 }
 
+func List() []string {
+	keys := []string{}
+	for key := range transportsMap {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
 func get(key string) (FactoryFunc, error) {
 	mu.RLock()
 	defer mu.RUnlock()

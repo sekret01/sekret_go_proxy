@@ -4,6 +4,11 @@ import (
 	"net"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/transports"
+)
+
+const (
+	tName = "tcp"
 )
 
 type TcpTransport struct{}
@@ -21,4 +26,8 @@ func (t *TcpTransport) Dial(address string) (net.Conn, error) {
 func newTcpTransport() (core.Transport, error) {
 	tcpTrancport := TcpTransport{}
 	return &tcpTrancport, nil
+}
+
+func init() {
+	transports.Registrate(tName, newTcpTransport)
 }
