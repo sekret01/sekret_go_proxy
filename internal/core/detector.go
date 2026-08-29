@@ -2,5 +2,5 @@ package core
 
 // Интерфейс для детекторов протоколов
 type Detector interface {
-	Detect()
+	Detect(data []byte) (ProtocolType, error)
 }

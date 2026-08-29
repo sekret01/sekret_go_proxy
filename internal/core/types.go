@@ -18,6 +18,9 @@ type MessageType uint8
 // Байт для идентификации пакета
 const MagicByte byte = 0x53
 
+// Ответ для запроса HTTPS CONNECT
+const HttpConnectResponse = "HTTP/1.1 200 Connection Established\r\n\r\n"
+
 // Типы протоколов
 const (
 	ProtoTest    ProtocolType = 127
