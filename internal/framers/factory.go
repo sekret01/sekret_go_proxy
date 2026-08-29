@@ -40,3 +40,11 @@ func NewFramer(cfg *config.Config) (core.Framer, error) {
 	}
 	return factory(cfg)
 }
+
+func List() []string {
+	keys := []string{}
+	for key := range framesMap {
+		keys = append(keys, key)
+	}
+	return keys
+}

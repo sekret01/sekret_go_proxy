@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
+	"github.com/sekret01/sekret_go_proxy/internal/framers"
 
 	"github.com/sekret01/sekret_go_proxy/internal/app"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
@@ -41,4 +42,5 @@ func main() {
 func printRegistrates() {
 	fmt.Printf("Encryptors: %s\n", encryptors.List())
 	fmt.Printf("Transports: %s\n", transports.List())
+	fmt.Printf("Framers: %s\n", framers.List())
 }
