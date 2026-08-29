@@ -5,4 +5,6 @@ type Config struct {
 	LocalPort  int    `yaml:"localport"`
 	RemoteHost string `yaml:"remotehost"`
 	RemotePort int    `yaml:"remoteport"`
+
+	TransportType string `yaml:"transport_type"`
 }
