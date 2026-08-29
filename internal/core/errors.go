@@ -8,6 +8,7 @@ var (
 
 	ErrInvalidEncryptKey   = errors.New("Encryptor with key not found")
 	ErrInvalidTransportKey = errors.New("Transport with key not found")
+	ErrInvalidFramerKey    = errors.New("Framer with key not found")
 
 	ErrBuildClientApp = errors.New("Error building ClientApp modules")
 )

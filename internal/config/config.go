@@ -8,4 +8,5 @@ type Config struct {
 
 	TransportType string `yaml:"transport_type"`
 	EncryptorType string `yaml:"encryptor_type"`
+	FramerType    string `yaml:"framer_type"`
 }
