@@ -10,7 +10,7 @@ import (
 type ConsoleLogger struct{}
 
 func (l *ConsoleLogger) Log(lvl logger.LoggerLevel, msg string) {
-	timeNow := time.Now().String()
+	timeNow := time.Now().Format(time.RFC3339Nano)
 	fmt.Printf("[%s] :: %s :: %s\n", logger.ColoredLevel(logger.GetLevelName(lvl)), timeNow, msg)
 }
 

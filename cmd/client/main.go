@@ -11,35 +11,44 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
 
+	"github.com/sekret01/sekret_go_proxy/pkg/logger"
+	"github.com/sekret01/sekret_go_proxy/pkg/logger/loggers"
+
 	_ "github.com/sekret01/sekret_go_proxy/internal/encryptors/mock"
 	_ "github.com/sekret01/sekret_go_proxy/internal/framers/simple"
 	_ "github.com/sekret01/sekret_go_proxy/internal/transports/tcp"
 )
 
 func main() {
-	fmt.Printf("# START IMPORTS\n")
+
+	hub := logger.GetLoggerHub(logger.DEBUG)
+
+	consoleLogger := loggers.NewConsoleLogger()
+
+	hub.Registrate(consoleLogger)
+
+	hub.Info("START IMPORTS")
 	cfg, err := config.LoadConfig("configs/client.example.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("# CONFIG NAS BEEN IMPORTED\n")
-	log.Println(cfg)
+	hub.Info("CONFIG NAS BEEN IMPORTED")
 
-	fmt.Printf("# REGISTRATED MODULS\n\n")
-	printRegistrates()
-	fmt.Println()
+	hub.Info("REGISTRATED MODULS")
+	printRegistrates(hub)
 
-	fmt.Printf("START BUILD ClientApp MODULS\n")
+	hub.Info("START BUILD ClientApp MODULS")
 	client, err := app.NewClientApp(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("RUN ClientApp\n")
+	hub.Info("RUN ClientApp")
 	client.Run()
 }
 
-func printRegistrates() {
+func printRegistrates(hub logger.LoggerHub) {
+	hub.Debug("RUUUN")
 	fmt.Printf("Encryptors: %s\n", encryptors.List())
 	fmt.Printf("Transports: %s\n", transports.List())
 	fmt.Printf("Framers: %s\n", framers.List())

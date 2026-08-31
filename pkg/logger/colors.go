@@ -42,9 +42,9 @@ func Colored(color ColorString, msg string) string {
 func ColoredLevel(level string) string {
 	switch level {
 	case DebugStr:
-		return Colored(Red, level)
+		return Colored(Cyan, level)
 	case InfoStr:
-		return Colored(White, level)
+		return Colored(Green, level)
 	case WarningStr:
 		return Colored(Yellow, level)
 	case ErrorStr:
