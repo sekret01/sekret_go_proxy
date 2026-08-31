@@ -11,6 +11,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
+	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type ClientApp struct {
@@ -34,11 +35,17 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	detector := detectors.NewDetector()
 
 	if !buildSuccess {
-		fmt.Printf("Errors in building moduls, stop program\n")
+		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildClientApp
 	}
 
-	tunnel := proxy.NewClientTunnel(transport, encryptor, framer, dispatcher, detector, cfg)
+	tunnel := proxy.NewClientTunnel(transport,
+		encryptor,
+		framer,
+		dispatcher,
+		detector,
+		cfg,
+		logger.GetLoggerHub().WithModule("ClientApp"))
 	return &ClientApp{
 		tunnel: *tunnel,
 	}, nil

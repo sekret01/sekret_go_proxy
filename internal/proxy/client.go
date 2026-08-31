@@ -11,6 +11,7 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 // Туннель для единого соединения с сервером
@@ -23,6 +24,8 @@ type ClientTunnel struct {
 
 	remoteAddr string // Адрес удаленного узла для подключения
 	localAddr  string // Адрес текущего узла
+
+	logger logger.Logger
 
 	serverTonnelConn net.Conn // Туннельное подключение к серверу
 	running          bool     // Состояние работы
@@ -280,7 +283,8 @@ func NewClientTunnel(
 	framer core.Framer,
 	dispatcher core.Dispatcher,
 	detector core.Detector,
-	cfg *config.Config) *ClientTunnel {
+	cfg *config.Config,
+	logger logger.Logger) *ClientTunnel {
 	return &ClientTunnel{
 		transport:        transport,
 		encryptor:        encryptor,
@@ -291,5 +295,6 @@ func NewClientTunnel(
 		serverTonnelConn: nil,
 		remoteAddr:       cfg.RemoteHost + ":" + strconv.Itoa(cfg.RemotePort),
 		localAddr:        cfg.LocalHost + ":" + strconv.Itoa(cfg.LocalPort),
+		logger:           logger,
 	}
 }

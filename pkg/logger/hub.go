@@ -45,11 +45,11 @@ func (h *Hub) Critical(msg string) { h.Log(CRITICAL, msg) }
 
 var hub *Hub = nil
 
-func GetLoggerHub(lvl LoggerLevel) LoggerHub {
+func GetLoggerHub() LoggerHub {
 	if hub == nil {
 		hub = &Hub{
 			loggers: []Logger{},
-			level:   lvl,
+			level:   DEBUG,
 		}
 	}
 	return hub

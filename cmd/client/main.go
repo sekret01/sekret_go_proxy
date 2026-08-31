@@ -21,10 +21,8 @@ import (
 
 func main() {
 
-	hub := logger.GetLoggerHub(logger.DEBUG)
-
+	hub := logger.GetLoggerHub()
 	consoleLogger := loggers.NewConsoleLogger()
-
 	hub.Registrate(consoleLogger)
 
 	hub.Info("START IMPORTS")
