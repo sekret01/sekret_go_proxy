@@ -1,16 +1,17 @@
 package dispatchers
 
 import (
-	"fmt"
 	"net"
 	"sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type Dispatcher struct {
 	connections map[core.RequestID]core.ConnWrapper
 	mu          sync.RWMutex
+	logger      logger.Logger
 }
 
 var (
@@ -21,7 +22,7 @@ var (
 func (d *Dispatcher) Register(id core.RequestID, requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	fmt.Printf("[DISPATCHER]: registrate: %x\n", id)
+	d.logger.Debug("Registrate [ " + string(id[:]) + " ]")
 	d.connections[id] = core.ConnWrapper{
 		ID:        id,
 		Conn:      requestConn,
@@ -34,10 +35,7 @@ func (d *Dispatcher) Register(id core.RequestID, requestConn net.Conn, protoType
 func (d *Dispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	fmt.Println("[DISPATCHER]: len = ", len(d.connections))
-	for key := range d.connections {
-		fmt.Printf("[DISPATCHER]: key: %x\n", key)
-	}
+	d.logger.Debug("Try to find [ " + string(id[:]) + " ]")
 	conn, exist := d.connections[id]
 	return conn, exist
 }
@@ -46,7 +44,7 @@ func (d *Dispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 func (d *Dispatcher) Delete(id core.RequestID) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	fmt.Printf("[DISPATCHER]: delete: %x\n", id)
+	d.logger.Debug("Delete: [ " + string(id[:]) + " ]")
 	delete(d.connections, id)
 }
 
@@ -55,6 +53,7 @@ func NewDispatcher() core.Dispatcher {
 	if dispatcher == nil {
 		dispatcher = &Dispatcher{
 			connections: map[core.RequestID]core.ConnWrapper{},
+			logger:      logger.GetLoggerHub().WithModule("Dispatcher"),
 		}
 	}
 	return dispatcher

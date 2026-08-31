@@ -2,6 +2,7 @@ package loggers
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -11,7 +12,7 @@ type ConsoleLogger struct{}
 
 func (l *ConsoleLogger) Log(lvl logger.LoggerLevel, msg string) {
 	timeNow := time.Now().Format(time.RFC3339Nano)
-	fmt.Printf("[%s] :: %s :: %s\n", logger.ColoredLevel(logger.GetLevelName(lvl)), timeNow, msg)
+	fmt.Printf("[%s] :: %s :: %s\n", logger.ColoredLevel(logger.GetLevelName(lvl)), timeNow, strings.Trim(msg, " \n"))
 }
 
 func (l *ConsoleLogger) Debug(msg string)    { l.Log(logger.DEBUG, msg) }

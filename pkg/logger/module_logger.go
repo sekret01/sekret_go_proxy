@@ -6,7 +6,7 @@ type ModuleLogger struct {
 }
 
 func (m *ModuleLogger) Log(lvl LoggerLevel, msg string) {
-	m.hub.Log(lvl, "["+msg+"]")
+	m.hub.Log(lvl, "["+Colored(Yellow, m.module)+"] :: "+msg)
 }
 
 func (m *ModuleLogger) Debug(msg string)    { m.Log(DEBUG, msg) }

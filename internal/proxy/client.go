@@ -3,7 +3,6 @@ package proxy
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -35,7 +34,7 @@ type ClientTunnel struct {
 func (c *ClientTunnel) Start() error {
 	conn, err := c.transport.Dial(c.remoteAddr)
 	if err != nil {
-		fmt.Printf("[ClientTunnel] ERR: connect remote addr -> %s\n", err.Error())
+		c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
 		return err
 	}
 	c.serverTonnelConn = conn
@@ -52,7 +51,7 @@ func (c *ClientTunnel) Start() error {
 	for {
 		requestConn, err := listener.Accept()
 		if err != nil {
-			fmt.Printf("[ClientTunnel] ERR: connectino accept -> %s\n", err.Error())
+			c.logger.Error("[ClientTunnel] ERR: connectino accept -> " + err.Error())
 			if c.running {
 				continue
 			} else {
@@ -66,24 +65,22 @@ func (c *ClientTunnel) Start() error {
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
 func (c *ClientTunnel) newRequestConnectionHandler(requestConn net.Conn) {
-	fmt.Printf("New connection: %s\n", requestConn.RemoteAddr().String())
+	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
 
 	// Чтение
 	reader := bufio.NewReader(requestConn)
 	data, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Printf("Error in read data: %s\n", err.Error())
-		// c.dispatcher.Delete(requestId)
+		c.logger.Error("Error in read data: " + err.Error())
 		requestConn.Close()
 		return
 	}
-	fmt.Printf("Get data: %s\n", data)
+	c.logger.Debug("Get data: " + data)
 
 	reader = bufio.NewReader(io.MultiReader(bytes.NewReader([]byte(data)), reader))
 
 	prefixSize := 8
 	if len(data) < 4 {
-		fmt.Printf("Data len is %d, close\n", prefixSize)
 		requestConn.Close()
 		return
 
@@ -93,22 +90,22 @@ func (c *ClientTunnel) newRequestConnectionHandler(requestConn net.Conn) {
 
 	proto, err := c.detector.Detect([]byte(data[:prefixSize]))
 	if err != nil {
-		fmt.Printf("Error in detect protocol: %s\n, close", err.Error())
+		c.logger.Error("Can not detect protocol: " + err.Error())
 		requestConn.Close()
 		return
 	}
 
 	switch proto {
 	case core.ProtoUnknown:
-		fmt.Printf("Get uncknown protocol, close")
+		c.logger.Debug("Get uncknown protocol, close")
 		requestConn.Close()
 		return
 	case core.ProtoSOCKS5:
-		fmt.Printf("Get SOCKS5 protocol, close")
+		c.logger.Debug("Get SOCKS5 protocol, close")
 		requestConn.Close()
 		return
 	case core.ProtoHTTP:
-		fmt.Printf("Get HTTP protocol, handle")
+		c.logger.Debug("Get HTTP protocol, handle")
 		c.handlerHttpProto(reader, requestConn)
 		requestConn.Close()
 		return
@@ -119,11 +116,11 @@ func (c *ClientTunnel) newRequestConnectionHandler(requestConn net.Conn) {
 func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Conn) {
 	header, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Printf("[handlerHttpProto] Error in read data: %s\n", err.Error())
+		c.logger.Error("[handlerHttpProto] Error in read data: " + err.Error())
 		requestConn.Close()
 		return
 	}
-	fmt.Printf("[handlerHttpProto] header: [%#v]\n", header)
+	c.logger.Debug("[handlerHttpProto] get header: \n" + strings.Trim(string(header), " \n"))
 
 	tokens := strings.Fields(header)
 	method := tokens[0]
@@ -142,7 +139,7 @@ func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Co
 
 	buf := make([]byte, 32*1024)
 	n, err := reader.Read(buf)
-	fmt.Printf("Get http buf[%d]: %#v\n", n, string(buf[:n]))
+	c.logger.Debug("Get http buf: " + string(buf[:n]))
 
 	c.sendIntoTunnel(requestId, core.MsgData, append([]byte(header), buf[:n]...))
 
@@ -150,7 +147,7 @@ func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Co
 
 // Отрпавление запроса на подключение сервером к targetHost при HTTPS запросе
 func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost string) {
-	fmt.Printf("[handleTunnelConnect] Start handle for : %s\n", targetHost)
+	c.logger.Debug("[handleTunnelConnect] Start handle for " + targetHost)
 	requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, true)
 	err := c.sendIntoTunnel(requestId, core.MsgConnect, []byte(targetHost))
 	if err != nil {
@@ -175,12 +172,12 @@ func (c *ClientTunnel) listenFromClient(requestId core.RequestID, requestConn ne
 	for {
 		size, err := requestConn.Read(buf)
 		if err != nil {
-			fmt.Printf("Client %x disconnect with error: %s\n", requestId, err.Error())
+			c.logger.Warning("Client disconnect with error: " + err.Error())
 			c.sendCloseIntoTunnel(requestId)
 			return
 		}
 		if size == 0 {
-			fmt.Printf("Client %x disconnect\n", requestId)
+			c.logger.Warning("Client disconnect")
 			c.sendCloseIntoTunnel(requestId)
 			return
 		}
@@ -190,51 +187,54 @@ func (c *ClientTunnel) listenFromClient(requestId core.RequestID, requestConn ne
 
 // Чтение, обработка и перессылка данных с сервера
 func (c *ClientTunnel) tunnelReader() {
+	c.logger.Info("[tunnelReader] Start tunnel listening")
 	bufHeader := make([]byte, c.framer.HeaderSize())
 
 	for {
-		fmt.Printf("[tunnelReader] wait header size: %d\n", c.framer.HeaderSize())
 		if _, err := io.ReadFull(c.serverTonnelConn, bufHeader); err != nil {
-			fmt.Println("[tunnelReader] CRITIACL ERROR: error in read tunnel (header): " + err.Error())
+			c.logger.Debug("[tunnelReader] CRITIACL ERROR: error in read tunnel (header): " + err.Error())
 			return
 		}
-		fmt.Printf("[tunnelReader] get header [%d]: %#v\n", len(bufHeader), string(bufHeader))
+		c.logger.Debug("[tunnelReader] get header: " + string(bufHeader))
 
 		payloadSize, err := c.framer.GetPayloadSize(bufHeader)
 		if err != nil {
-			fmt.Println("[tunnelReader] ERROR: cannot get payload size (header): " + err.Error())
+			c.logger.Debug("[tunnelReader] ERROR: cannot get payload size (header): " + err.Error())
 			return
 		}
-		fmt.Printf("[tunnelReader] wait payload size: %d\n", payloadSize)
+		c.logger.Debug("[tunnelReader] wait payload size: " + strconv.Itoa(payloadSize))
 
 		bufPayload := make([]byte, payloadSize) // TODO изменять в конфигах bufSize
 		if _, err := io.ReadFull(c.serverTonnelConn, bufPayload); err != nil {
-			fmt.Println("[tunnelReader] ERROR: cannot read payload (payload): " + err.Error())
+			c.logger.Debug("[tunnelReader] ERROR: cannot read payload (payload): " + err.Error())
 			return
 		}
 
-		fmt.Printf("[tunnelReader] appending: %#v + %#v\n", string(bufHeader), string(bufPayload))
 		frame := append(bufHeader, bufPayload...)
 		data, msgType, requestId, err := c.framer.Unframe(frame)
 		decryptData := c.encryptor.Decrypt(data)
 		if err != nil {
-			fmt.Println("[tunnelReader] ERROR: unframe: " + err.Error())
+			c.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
 			continue
 		}
 
 		conWrapper, ok := c.dispatcher.Find(requestId)
 		requestCon := conWrapper.Conn
 		if !ok {
-			fmt.Printf("[tunnelReader] ERROR: not found connection [%x]\n", requestId)
+			c.logger.Warning("[tunnelReader] ERROR: not found connection [" + string(requestId[:]) + "]")
 			continue
 		}
 
 		switch msgType {
 		case core.MsgData:
-			fmt.Printf("[tunnelReader] send data [%s]...\n", decryptData[:10])
+			n := 10
+			if len(decryptData) < n {
+				n = len(decryptData)
+			}
+			c.logger.Debug("[tunnelReader] send data [" + string(decryptData[:n]) + "...]")
 			requestCon.Write(decryptData)
 			if !conWrapper.IsTunnel {
-				fmt.Printf("[tunnelReader] not nunnel connection [%x], close\n", requestId)
+				c.logger.Debug("[tunnelReader] close not tunnel connection [" + string(requestId[:]) + "]")
 				c.sendCloseIntoTunnel(requestId)
 				requestCon.Close()
 				c.dispatcher.Delete(requestId)
@@ -253,27 +253,27 @@ func (c *ClientTunnel) tunnelReader() {
 }
 
 func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	fmt.Printf("[sendIntoTunnel] Prepeare new msg: requestId: [%x], msgType: [%#v], msg: [%#v]\n", requestId, msgType, string(payload[:]))
+	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + string(requestId[:]) + "], msgType: [" + string(msgType) + "], msg: [" + string(payload) + "]")
 	payloadEncode := c.encryptor.Encrypt([]byte(payload))
 	frame, err := c.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {
-		fmt.Printf("[sendIntoTunnel] Error in send data: [%s]\n", err.Error())
+		c.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
 	_, err = c.serverTonnelConn.Write(frame)
-	fmt.Printf("[sendIntoTunnel] Data has been sent\n")
+	c.logger.Debug("[sendIntoTunnel] Data has been sent")
 	return nil
 }
 
 func (c *ClientTunnel) sendCloseIntoTunnel(requestId core.RequestID) {
-	fmt.Printf("[sendCloseIntoTunnel] close %x\n", requestId)
+	c.logger.Debug("[sendCloseIntoTunnel] close " + string(requestId[:]))
 	c.sendIntoTunnel(requestId, core.MsgClose, []byte{})
 }
 
 func (c *ClientTunnel) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
 	requestId := core.GenerateID()
 	c.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
-	fmt.Printf("Save conn with UUID %x\n", requestId)
+	c.logger.Debug("Save conn with UUID " + string(requestId[:]))
 	return requestId
 }
 
