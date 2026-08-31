@@ -33,6 +33,7 @@ type ClientTunnel struct {
 // Запуск соединения между клиентом и удаленным узлом
 func (c *ClientTunnel) Start() error {
 	conn, err := c.transport.Dial(c.remoteAddr)
+	c.logger.Info("Start listen on " + c.localAddr)
 	if err != nil {
 		c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
 		return err
