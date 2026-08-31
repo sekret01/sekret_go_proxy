@@ -18,7 +18,7 @@ type ClientApp struct {
 }
 
 func (p *ClientApp) Run() {
-
+	p.tunnel.Start()
 }
 
 func NewClientApp(cfg *config.Config) (*ClientApp, error) {
@@ -38,7 +38,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		return nil, core.ErrBuildClientApp
 	}
 
-	tunnel := proxy.NewClientTunnel(transport, encryptor, framer, dispatcher, detector)
+	tunnel := proxy.NewClientTunnel(transport, encryptor, framer, dispatcher, detector, cfg)
 	return &ClientApp{
 		tunnel: *tunnel,
 	}, nil

@@ -41,6 +41,8 @@ const (
 
 // Структура для хранения информации о подключении
 type ConnWrapper struct {
-	ID   RequestID
-	Conn net.Conn
+	ID        RequestID
+	Conn      net.Conn
+	ProtoType ProtocolType // Тип протокола (HTTP, SOCKS5)
+	IsTunnel  bool         // нужно ли держать открытым (HTTP false)
 }

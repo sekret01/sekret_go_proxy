@@ -2,6 +2,7 @@ package noopgo
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -37,9 +38,10 @@ func (n *SimpleFramer) Unframe(data []byte) ([]byte, core.MessageType, core.Requ
 	if len(data) < headerLen {
 		return nil, core.MsgError, core.RequestID{}, core.ErrInsufficientHeaderLensth
 	}
-
+	fmt.Printf("GET FRAME: %#v\n", string(data))
 	offset := 0
 	magicByte := data[offset]
+	fmt.Printf("GET MAGIC FROM FRAME: %#v, WAIT: %#v\n", magicByte, core.MagicByte)
 	if magicByte != core.MagicByte {
 		return nil, core.MsgError, core.RequestID{}, core.ErrInvalidMagic
 	}
@@ -48,15 +50,36 @@ func (n *SimpleFramer) Unframe(data []byte) ([]byte, core.MessageType, core.Requ
 	offset += 1
 	requestId := [16]byte(data[offset : offset+16])
 	offset += 16
-	dataSize := binary.BigEndian.Uint64(data[offset : offset+4])
+	dataSize := binary.BigEndian.Uint32(data[offset : offset+4])
 	offset += 4
 
-	if uint64(len(data)) < dataSize+uint64(headerLen) {
+	if uint32(len(data)) < dataSize+uint32(headerLen) {
 		return nil, core.MsgError, core.RequestID{}, core.ErrInsufficientPayloadLensth
 	}
 
 	payload := data[offset:]
 	return payload, msgType, requestId, nil
+}
+
+// Получение длины для заголовка данного протокола (в байтах)
+func (f *SimpleFramer) HeaderSize() int {
+	return 22
+}
+
+// Попытка получить длину данных payload, указанную в заголовке.
+// Если заголовок меньше необходимого - ошибка
+func (f *SimpleFramer) GetPayloadSize(data []byte) (int, error) {
+	if len(data) < f.HeaderSize() {
+		return -1, core.ErrInsufficientHeaderLensth
+	}
+	offset := 0 + 1 + 1 + 16
+	fmt.Printf("[FRAMER GET PAYLOAD SIZE] data: %#v\n", string(data))
+	fmt.Printf("[FRAMER GET PAYLOAD SIZE] size bytes: %#v\n", string(data[offset:offset+4]))
+
+	dataSize := binary.BigEndian.Uint32(data[offset : offset+4])
+	fmt.Printf("[FRAMER GET PAYLOAD SIZE] res size: %d\n", dataSize)
+
+	return int(dataSize), nil
 }
 
 func NewSimpleFramer(cfg *config.Config) (core.Framer, error) {
