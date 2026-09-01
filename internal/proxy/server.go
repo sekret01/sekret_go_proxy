@@ -1,12 +1,12 @@
 package proxy
 
 import (
-	"io"
 	"net"
 	"strconv"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
@@ -51,31 +51,13 @@ func (s *ServerTunnel) Start() error {
 // Чтение, обработка и перессылка данных с клиентских узлов
 func (s *ServerTunnel) tunnelReader() {
 	s.logger.Info("[tunnelReader] Start tunnel listening")
-	bufHeader := make([]byte, s.framer.HeaderSize())
 
 	for {
-		// HEADER
-		if _, err := io.ReadFull(s.tonnelConn, bufHeader); err != nil {
-			s.logger.Debug("[tunnelReader] CRITIACL ERROR: error in read tunnel (header): " + err.Error())
-			return
-		}
-		s.logger.Debug("[tunnelReader] get header: " + string(bufHeader))
-
-		// PAYLOAD
-		payloadSize, err := s.framer.GetPayloadSize(bufHeader)
+		frame, err := ReadFrameFromConnection(s.tonnelConn, s.framer)
 		if err != nil {
-			s.logger.Debug("[tunnelReader] ERROR: cannot get payload size (header): " + err.Error())
+			s.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 			return
 		}
-		s.logger.Debug("[tunnelReader] wait payload size: " + strconv.Itoa(payloadSize))
-
-		bufPayload := make([]byte, payloadSize) // TODO изменять в конфигах bufSize
-		if _, err := io.ReadFull(s.tonnelConn, bufPayload); err != nil {
-			s.logger.Debug("[tunnelReader] ERROR: cannot read payload (payload): " + err.Error())
-			return
-		}
-
-		frame := append(bufHeader, bufPayload...)
 		data, msgType, requestId, err := s.framer.Unframe(frame)
 		decryptData := s.encryptor.Decrypt(data)
 		if err != nil {
@@ -84,73 +66,50 @@ func (s *ServerTunnel) tunnelReader() {
 		}
 
 		switch msgType {
-
-		// Подключение к target серверу
 		case core.MsgConnect:
 			targetCon, err := s.transport.Dial(string(decryptData))
 			if err != nil {
-				s.logger.Error("[tunnelReader] Can not connect to target server [" + string(decryptData) + "] " + err.Error())
+				s.logger.Error("[tunnelReader] Can not connect to target server [" + utils.BytesToString(decryptData, 20) + "] " + err.Error())
 				continue
 			}
 			s.dispatcher.Register(requestId, targetCon, core.ProtoTest, true)
-			// Обработка получения данных из conTarget
 			go s.targetConnectinoHandler(requestId, targetCon)
-
 		case core.MsgData:
 			conWrapper, ok := s.dispatcher.Find(requestId)
 			if !ok {
-				s.logger.Warning("[tunnelReader] ERROR: not found connection [" + string(requestId[:]) + "]")
+				s.logger.Warning("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
 				continue
 			}
 			targetCon := conWrapper.Conn
-
-			// Упростить лог
-			// ====================
-			n := 10
-			if len(decryptData) < n {
-				n = len(decryptData)
-			}
-			s.logger.Debug("[tunnelReader] send data [" + string(decryptData[:n]) + "...]")
-			// ====================
+			s.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 20) + "...]")
 			targetCon.Write(decryptData)
-
 		case core.MsgClose:
 			conWrapper, ok := s.dispatcher.Find(requestId)
 			if !ok {
-				s.logger.Warning("[tunnelReader] ERROR: not found connection [" + string(requestId[:]) + "]")
+				s.logger.Warning("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
 				continue
 			}
 			conWrapper.Conn.Close()
-			s.dispatcher.Delete(requestId)
-
-			// case core.MsgError:
-			// 	requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			// 	requestCon.Close()
-			// 	s.dispatcher.Delete(requestId)
+			closeConnection(s.dispatcher, requestId)
 		}
-
 	}
 }
 
 // Чтение ответов из подключения к target-серверу
 func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn) {
 	s.logger.Debug("Create new connection: " + targetCon.RemoteAddr().String())
-	defer targetCon.Close()
-	defer s.dispatcher.Delete(requestId)
 
 	buf := make([]byte, 32*1024)
 	for {
 		size, err := targetCon.Read(buf)
 		if err != nil {
 			s.logger.Warning("Client disconnect with error: " + err.Error())
-			s.sendCloseIntoTunnel(requestId)
-			s.dispatcher.Delete(requestId)
+			closeConnection(s.dispatcher, requestId)
 			return
 		}
 		if size == 0 {
 			s.logger.Warning("Client disconnect")
-			s.sendCloseIntoTunnel(requestId)
-			s.dispatcher.Delete(requestId)
+			closeConnection(s.dispatcher, requestId)
 			return
 		}
 		s.sendIntoTunnel(requestId, core.MsgData, buf[:size])
@@ -158,7 +117,7 @@ func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetC
 }
 
 func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + string(requestId[:]) + "], msgType: [" + string(msgType) + "], msg: [" + string(payload) + "]")
+	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
 	payloadEncode := s.encryptor.Encrypt([]byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {
@@ -171,7 +130,7 @@ func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 }
 
 func (s *ServerTunnel) sendCloseIntoTunnel(requestId core.RequestID) {
-	s.logger.Debug("[sendCloseIntoTunnel] close " + string(requestId[:]))
+	s.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
 	s.sendIntoTunnel(requestId, core.MsgClose, []byte{})
 }
 

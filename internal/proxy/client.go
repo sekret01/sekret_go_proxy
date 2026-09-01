@@ -215,7 +215,7 @@ func (c *ClientTunnel) tunnelReader() {
 			if len(decryptData) < n {
 				n = len(decryptData)
 			}
-			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 2000) + "...]") // TODO 20
+			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 20) + "...]") // TODO 20
 			requestCon.Write(decryptData)
 			if !conWrapper.IsTunnel {
 				dataStr := string(decryptData)
@@ -223,27 +223,17 @@ func (c *ClientTunnel) tunnelReader() {
 					strings.Contains(dataStr, "Connection: close") {
 					c.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(requestId) + "]")
 					c.sendCloseIntoTunnel(requestId)
-					c.closeConnection(requestId)
+					closeConnection(c.dispatcher, requestId)
 				}
 
 			}
 		case core.MsgClose:
-			c.closeConnection(requestId)
+			closeConnection(c.dispatcher, requestId)
 		case core.MsgError:
 			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			c.closeConnection(requestId)
+			closeConnection(c.dispatcher, requestId)
 		}
 	}
-}
-
-func (c *ClientTunnel) closeConnection(requestId core.RequestID) {
-	conWrapper, ok := c.dispatcher.Find(requestId)
-	con := conWrapper.Conn
-	if !ok {
-		return
-	}
-	con.Close()
-	c.dispatcher.Delete(requestId)
 }
 
 func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
