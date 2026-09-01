@@ -3,14 +3,19 @@ package loggers
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type ConsoleLogger struct{}
+type ConsoleLogger struct {
+	mu sync.Mutex
+}
 
 func (l *ConsoleLogger) Log(lvl logger.LoggerLevel, msg string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	timeNow := time.Now().Format(time.RFC3339Nano)
 	fmt.Printf("[%s] :: %s :: %s\n", logger.ColoredLevel(logger.GetLevelName(lvl)), timeNow, strings.Trim(msg, " \n"))
 }

@@ -24,7 +24,7 @@ func main() {
 	hub := logger.GetLoggerHub()
 	consoleLogger := loggers.NewConsoleLogger()
 	hub.Registrate(consoleLogger)
-	hub.SetLevel(logger.INFO)
+	hub.SetLevel(logger.DEBUG)
 
 	hub.Info("START IMPORTS")
 	cfg, err := config.LoadConfig("configs/client.example.yaml")

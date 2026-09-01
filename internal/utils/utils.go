@@ -2,12 +2,13 @@ package utils
 
 import (
 	"encoding/hex"
+	"strconv"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
 func RequestIdToString(id core.RequestID) string {
-	return hex.Dump(id[:])
+	return hex.EncodeToString(id[:])
 }
 
 func ListToString(list []string) string {
@@ -19,4 +20,21 @@ func ListToString(list []string) string {
 		}
 	}
 	return result
+}
+
+func BytesToString(data []byte, needLen int) string {
+	resultLen := min(needLen, len(data))
+	result := strconv.Quote(string(data[:resultLen]))
+	if len(data) > resultLen {
+		result += "..."
+	}
+	return result
+}
+
+func IntToString(num int) string {
+	return strconv.FormatUint(uint64(num), 16)
+}
+
+func MessageTypeToHexString(msgType core.MessageType) string {
+	return IntToString(int(msgType))
 }

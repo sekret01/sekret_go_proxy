@@ -10,6 +10,7 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
@@ -40,15 +41,16 @@ func (c *ClientTunnel) Start() error {
 	}
 	c.serverTonnelConn = conn
 
-	// запуск получения данных из туннеля
 	go c.tunnelReader()
 
 	listener, err := c.transport.Listen(c.localAddr)
 	if err != nil {
 		return err
 	}
+	return c.connectionsListener(listener)
+}
 
-	// Мониторинг подключений
+func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 	for {
 		requestConn, err := listener.Accept()
 		if err != nil {
@@ -56,27 +58,28 @@ func (c *ClientTunnel) Start() error {
 			if c.running {
 				continue
 			} else {
-				return nil
+				return err
 			}
 		}
-		go c.newRequestConnectionHandler(requestConn)
+		go c.newConnectionHandler(requestConn)
 	}
 }
 
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
-func (c *ClientTunnel) newRequestConnectionHandler(requestConn net.Conn) {
+func (c *ClientTunnel) newConnectionHandler(requestConn net.Conn) {
 	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
 
-	// Чтение
 	reader := bufio.NewReader(requestConn)
 	data, err := reader.ReadString('\n')
 	if err != nil {
-		c.logger.Error("Error in read data: " + err.Error())
+		if err != io.EOF {
+			c.logger.Error("Error in read data: " + err.Error())
+		}
 		requestConn.Close()
 		return
 	}
-	c.logger.Debug("Get data: " + data)
+	c.logger.Debug("Get data: " + utils.BytesToString([]byte(data), 20))
 
 	reader = bufio.NewReader(io.MultiReader(bytes.NewReader([]byte(data)), reader))
 
@@ -84,10 +87,9 @@ func (c *ClientTunnel) newRequestConnectionHandler(requestConn net.Conn) {
 	if len(data) < 4 {
 		requestConn.Close()
 		return
-
-	} else if len(data) < 8 {
-		prefixSize = len(data)
 	}
+
+	prefixSize = min(len(data), 8)
 
 	proto, err := c.detector.Detect([]byte(data[:prefixSize]))
 	if err != nil {
@@ -95,7 +97,10 @@ func (c *ClientTunnel) newRequestConnectionHandler(requestConn net.Conn) {
 		requestConn.Close()
 		return
 	}
+	c.switchProtocol(proto, requestConn, reader)
+}
 
+func (c *ClientTunnel) switchProtocol(proto core.ProtocolType, requestConn net.Conn, reader *bufio.Reader) {
 	switch proto {
 	case core.ProtoUnknown:
 		c.logger.Debug("Get uncknown protocol, close")
@@ -111,39 +116,38 @@ func (c *ClientTunnel) newRequestConnectionHandler(requestConn net.Conn) {
 		requestConn.Close()
 		return
 	}
-
 }
 
 func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Conn) {
-	header, err := reader.ReadString('\n')
+	headerFirstString, err := reader.ReadString('\n')
 	if err != nil {
 		c.logger.Error("[handlerHttpProto] Error in read data: " + err.Error())
 		requestConn.Close()
 		return
 	}
-	c.logger.Debug("[handlerHttpProto] get header: \n" + strings.Trim(string(header), " \n"))
+	c.logger.Debug("[handlerHttpProto] get header: \n" + strings.Trim(string(headerFirstString), " \n"))
 
-	tokens := strings.Fields(header)
-	method := tokens[0]
-	target := tokens[1]
+	parsedHeaderFirstString := strings.Fields(headerFirstString)
+	method := parsedHeaderFirstString[0]
+	target := parsedHeaderFirstString[1]
 
-	// if HTTPS
 	if method == "CONNECT" {
 		requestConn.Write([]byte(core.HttpConnectResponse))
 		c.handleTunnelConnect(requestConn, target)
 		return
+	} else {
+		requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
+		prepTarget := strings.Replace(target, "http://", "", 1)
+		prepTarget = prepTarget[:len(prepTarget)-1] + ":80"
+		c.sendIntoTunnel(requestId, core.MsgConnect, []byte(prepTarget))
+
+		buf := make([]byte, 32*1024)
+		n, _ := reader.Read(buf)
+		c.logger.Debug("Get http buf: " + utils.BytesToString(buf, 20))
+
+		c.sendIntoTunnel(requestId, core.MsgData, append([]byte(headerFirstString), buf[:n]...))
+		return
 	}
-
-	// if HTTPS
-	requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
-	c.sendIntoTunnel(requestId, core.MsgConnect, []byte(target))
-
-	buf := make([]byte, 32*1024)
-	n, err := reader.Read(buf)
-	c.logger.Debug("Get http buf: " + string(buf[:n]))
-
-	c.sendIntoTunnel(requestId, core.MsgData, append([]byte(header), buf[:n]...))
-
 }
 
 // Отрпавление запроса на подключение сервером к targetHost при HTTPS запросе
@@ -156,16 +160,11 @@ func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost stri
 		c.dispatcher.Delete(requestId)
 		return
 	}
-
-	c.listenFromClient(requestId, requestConn)
-
-	// TEST
-	requestConn.Close()
-	c.dispatcher.Delete(requestId)
+	c.listenFromClientForTunnel(requestId, requestConn)
 }
 
 // Цикличное чтение данных с клиента (при HTTPS)
-func (c *ClientTunnel) listenFromClient(requestId core.RequestID, requestConn net.Conn) {
+func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, requestConn net.Conn) {
 	defer requestConn.Close()
 	defer c.dispatcher.Delete(requestId)
 
@@ -173,12 +172,12 @@ func (c *ClientTunnel) listenFromClient(requestId core.RequestID, requestConn ne
 	for {
 		size, err := requestConn.Read(buf)
 		if err != nil {
-			c.logger.Warning("Client disconnect with error: " + err.Error())
+			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
 			c.sendCloseIntoTunnel(requestId)
 			return
 		}
 		if size == 0 {
-			c.logger.Warning("Client disconnect")
+			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect")
 			c.sendCloseIntoTunnel(requestId)
 			return
 		}
@@ -189,29 +188,13 @@ func (c *ClientTunnel) listenFromClient(requestId core.RequestID, requestConn ne
 // Чтение, обработка и перессылка данных с сервера
 func (c *ClientTunnel) tunnelReader() {
 	c.logger.Info("[tunnelReader] Start tunnel listening")
-	bufHeader := make([]byte, c.framer.HeaderSize())
 
 	for {
-		if _, err := io.ReadFull(c.serverTonnelConn, bufHeader); err != nil {
-			c.logger.Debug("[tunnelReader] CRITIACL ERROR: error in read tunnel (header): " + err.Error())
-			return
-		}
-		c.logger.Debug("[tunnelReader] get header: " + string(bufHeader))
-
-		payloadSize, err := c.framer.GetPayloadSize(bufHeader)
+		frame, err := ReadFrameFromConnection(c.serverTonnelConn, c.framer)
 		if err != nil {
-			c.logger.Debug("[tunnelReader] ERROR: cannot get payload size (header): " + err.Error())
+			c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 			return
 		}
-		c.logger.Debug("[tunnelReader] wait payload size: " + strconv.Itoa(payloadSize))
-
-		bufPayload := make([]byte, payloadSize) // TODO изменять в конфигах bufSize
-		if _, err := io.ReadFull(c.serverTonnelConn, bufPayload); err != nil {
-			c.logger.Debug("[tunnelReader] ERROR: cannot read payload (payload): " + err.Error())
-			return
-		}
-
-		frame := append(bufHeader, bufPayload...)
 		data, msgType, requestId, err := c.framer.Unframe(frame)
 		decryptData := c.encryptor.Decrypt(data)
 		if err != nil {
@@ -222,39 +205,49 @@ func (c *ClientTunnel) tunnelReader() {
 		conWrapper, ok := c.dispatcher.Find(requestId)
 		requestCon := conWrapper.Conn
 		if !ok {
-			c.logger.Warning("[tunnelReader] ERROR: not found connection [" + string(requestId[:]) + "]")
+			c.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
 			continue
 		}
-
+		c.logger.Debug("[tunnelReader] Get data [ " + utils.RequestIdToString(requestId) + " ], msg_type: " + utils.MessageTypeToHexString(msgType))
 		switch msgType {
 		case core.MsgData:
 			n := 10
 			if len(decryptData) < n {
 				n = len(decryptData)
 			}
-			c.logger.Debug("[tunnelReader] send data [" + string(decryptData[:n]) + "...]")
+			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 2000) + "...]") // TODO 20
 			requestCon.Write(decryptData)
 			if !conWrapper.IsTunnel {
-				c.logger.Debug("[tunnelReader] close not tunnel connection [" + string(requestId[:]) + "]")
-				c.sendCloseIntoTunnel(requestId)
-				requestCon.Close()
-				c.dispatcher.Delete(requestId)
+				dataStr := string(decryptData)
+				if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
+					strings.Contains(dataStr, "Connection: close") {
+					c.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(requestId) + "]")
+					c.sendCloseIntoTunnel(requestId)
+					c.closeConnection(requestId)
+				}
+
 			}
 		case core.MsgClose:
-			requestCon.Close()
-			c.dispatcher.Delete(requestId)
+			c.closeConnection(requestId)
 		case core.MsgError:
 			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			requestCon.Close()
-			c.dispatcher.Delete(requestId)
+			c.closeConnection(requestId)
 		}
-
 	}
+}
 
+func (c *ClientTunnel) closeConnection(requestId core.RequestID) {
+	conWrapper, ok := c.dispatcher.Find(requestId)
+	con := conWrapper.Conn
+	if !ok {
+		return
+	}
+	con.Close()
+	c.dispatcher.Delete(requestId)
 }
 
 func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + string(requestId[:]) + "], msgType: [" + string(msgType) + "], msg: [" + string(payload) + "]")
+	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
 	payloadEncode := c.encryptor.Encrypt([]byte(payload))
 	frame, err := c.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {
@@ -267,14 +260,14 @@ func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 }
 
 func (c *ClientTunnel) sendCloseIntoTunnel(requestId core.RequestID) {
-	c.logger.Debug("[sendCloseIntoTunnel] close " + string(requestId[:]))
+	c.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
 	c.sendIntoTunnel(requestId, core.MsgClose, []byte{})
 }
 
 func (c *ClientTunnel) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
 	requestId := core.GenerateID()
 	c.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
-	c.logger.Debug("Save conn with UUID " + string(requestId[:]))
+	c.logger.Debug("Save conn with UUID " + utils.RequestIdToString(requestId))
 	return requestId
 }
 

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
@@ -22,7 +23,7 @@ var (
 func (d *Dispatcher) Register(id core.RequestID, requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.logger.Debug("Registrate [ " + string(id[:]) + " ]")
+	d.logger.Debug("Registrate [ " + utils.RequestIdToString(id) + " ]")
 	d.connections[id] = core.ConnWrapper{
 		ID:        id,
 		Conn:      requestConn,
@@ -35,7 +36,7 @@ func (d *Dispatcher) Register(id core.RequestID, requestConn net.Conn, protoType
 func (d *Dispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	d.logger.Debug("Try to find [ " + string(id[:]) + " ]")
+	d.logger.Debug("Try to find [ " + utils.RequestIdToString(id) + " ]")
 	conn, exist := d.connections[id]
 	return conn, exist
 }
@@ -44,7 +45,7 @@ func (d *Dispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 func (d *Dispatcher) Delete(id core.RequestID) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.logger.Debug("Delete: [ " + string(id[:]) + " ]")
+	d.logger.Debug("Delete: [ " + utils.RequestIdToString(id) + " ]")
 	delete(d.connections, id)
 }
 
