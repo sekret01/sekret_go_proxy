@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/detectors"
@@ -53,7 +51,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 
 func isContinue(err error) bool {
 	if err != nil {
-		fmt.Printf("Error in build: %s\n", err)
+		logger.GetLoggerHub().Error("Error in build: " + err.Error())
 		return false
 	}
 	return true

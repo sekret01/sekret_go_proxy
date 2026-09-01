@@ -20,7 +20,6 @@ var (
 func Reigstrate(key string, factory factoryFunc) {
 	mu.Lock()
 	defer mu.Unlock()
-
 	if _, exist := encryptionsMap[key]; exist {
 		panic("Encryption [" + key + "] already exists")
 	}
@@ -29,9 +28,6 @@ func Reigstrate(key string, factory factoryFunc) {
 }
 
 // Попытка получить encryptor-factory по ключу.
-// Return:
-// - Encryptor-структура или пустое значение
-// - значение по ключу найдено - true, иначе false
 func get(key string) (factoryFunc, error) {
 	mu.RLock()
 	encr, ex := encryptionsMap[key]
