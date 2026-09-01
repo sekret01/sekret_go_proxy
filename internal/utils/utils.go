@@ -13,8 +13,9 @@ func RequestIdToString(id core.RequestID) string {
 func ListToString(list []string) string {
 	result := ""
 	for i, word := range list {
+		result += word
 		if i < len(list)-1 {
-			result += word + ", "
+			result += ", "
 		}
 	}
 	return result

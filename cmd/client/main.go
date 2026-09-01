@@ -26,8 +26,8 @@ func main() {
 
 	hub.Info("START LOAD CONFIG")
 	cfg := loadConfig(hub)
+	setLoggerConfig(hub, cfg)
 
-	hub.Info("START REGISTRATE MODULS")
 	printRegistrates(hub)
 
 	hub.Info("START BUILD CLIENT-APP MODULS")
@@ -54,6 +54,24 @@ func setupLogger() logger.LoggerHub {
 	return hub
 }
 
+func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
+	switch cfg.LoggerLevel {
+	case logger.DebugStr:
+		hub.SetLevel(logger.DEBUG)
+	case logger.InfoStr:
+		hub.SetLevel(logger.INFO)
+	case logger.WarningStr:
+		hub.SetLevel(logger.WARNING)
+	case logger.ErrorStr:
+		hub.SetLevel(logger.ERROR)
+	case logger.CriticalStr:
+		hub.SetLevel(logger.CRITICAL)
+	default:
+		hub.Critical("Unknown log_level in configs: " + cfg.LoggerLevel)
+		criticalExit()
+	}
+}
+
 func builClientApp(hub logger.LoggerHub, cfg *config.Config) app.ClientApp {
 	client, err := app.NewClientApp(cfg)
 	if err != nil {
@@ -64,7 +82,7 @@ func builClientApp(hub logger.LoggerHub, cfg *config.Config) app.ClientApp {
 }
 
 func printRegistrates(hub logger.LoggerHub) {
-	hub.Debug("List of egistrated moduls")
+	hub.Debug("List of registrated moduls")
 	hub.Debug("Encryptors: " + utils.ListToString(encryptors.List()))
 	hub.Debug("Transports: " + utils.ListToString(transports.List()))
 	hub.Debug("Framers: " + utils.ListToString(framers.List()))
