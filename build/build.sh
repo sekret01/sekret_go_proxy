@@ -1,37 +1,33 @@
-@echo off
+#!/bin/bash
 
-set PROJECT_PATH=%cd%
-set BUILD_PATH=%PROJECT_PATH%\build\
-set BIN_PATH=%cd%\build\_bin
-set CONFIGS_PATH=%cd%\build\_configs
+PROJECT_PATH=$(pwd)
+BUILD_PATH="${PROJECT_PATH}/build/"
+BIN_PATH="${PROJECT_PATH}/build/_bin"
+CONFIGS_PATH="${PROJECT_PATH}/build/_configs"
 
-echo path: %BUILD_PATH%
+echo "path: ${BUILD_PATH}"
 
-:: CREATE DIRS
-if not exist %BIN_PATH% (
-    mkdir %BIN_PATH%
-)
-if not exist %CONFIGS_PATH% (
-    mkdir %CONFIGS_PATH%
-)
+# CREATE DIRS
+mkdir -p "${BIN_PATH}"
+mkdir -p "${CONFIGS_PATH}"
 
-:: CLEAR BUILDS
-del /Q %BIN_PATH%\*
-del /Q %CONFIGS_PATH%\*
+# CLEAR BUILDS
+rm -f "${BIN_PATH}"/*
+rm -f "${CONFIGS_PATH}"/*
 
-:: BUILD BINS
-go build -o %BIN_PATH%\server.exe %PROJECT_PATH%\cmd\server\main.go
-if errorlevel 1 (
-    echo [ERROR] Server build failed!
-    exit /b 1
-)
+# BUILD BINS
+go build -o "${BIN_PATH}/server" "${PROJECT_PATH}/cmd/server/main.go"
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Server build failed!"
+    exit 1
+fi
 
-go build -o %BIN_PATH%\client.exe %PROJECT_PATH%\cmd\client\main.go
-if errorlevel 1 (
-    echo [ERROR] Server build failed!
-    exit /b 1
-)
+go build -o "${BIN_PATH}/client" "${PROJECT_PATH}/cmd/client/main.go"
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Client build failed!"
+    exit 1
+fi
 
-:: COPY CONFIGS
-copy %PROJECT_PATH%\configs\server.example.yaml %CONFIGS_PATH%\server.yaml
-copy %PROJECT_PATH%\configs\client.example.yaml %CONFIGS_PATH%\client.yaml
+# COPY CONFIGS
+cp "${PROJECT_PATH}/configs/server.example.yaml" "${CONFIGS_PATH}/server.yaml"
+cp "${PROJECT_PATH}/configs/client.example.yaml" "${CONFIGS_PATH}/client.yaml"
