@@ -38,7 +38,7 @@ func main() {
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {
-	cfg, err := config.LoadConfig("configs/client.example.yaml")
+	cfg, err := config.LoadConfig("configs/client.yaml")
 	if err != nil {
 		hub.Critical("[loadConfig]: " + err.Error())
 		criticalExit()

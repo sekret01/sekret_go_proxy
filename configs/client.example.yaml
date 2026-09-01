@@ -1,10 +1,10 @@
-localhost: 127.0.0.1
-localport: 12385
-remotehost: 127.0.0.1
-remoteport: 32658
+localhost: 
+localport: 
+remotehost: 
+remoteport: 
 
-transport_type: tcp
-encryptor_type: mock
-framer_type: simple
+transport_type: 
+encryptor_type: 
+framer_type: 
 
-log_level: INFO
+log_level: 
