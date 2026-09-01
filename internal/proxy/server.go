@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"io"
 	"net"
 	"strconv"
 
@@ -77,7 +78,7 @@ func (s *ServerTunnel) tunnelReader() {
 		case core.MsgData:
 			conWrapper, ok := s.dispatcher.Find(requestId)
 			if !ok {
-				s.logger.Warning("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
+				s.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
 				continue
 			}
 			targetCon := conWrapper.Conn
@@ -86,7 +87,7 @@ func (s *ServerTunnel) tunnelReader() {
 		case core.MsgClose:
 			conWrapper, ok := s.dispatcher.Find(requestId)
 			if !ok {
-				s.logger.Warning("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
+				s.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
 				continue
 			}
 			conWrapper.Conn.Close()
@@ -103,12 +104,14 @@ func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetC
 	for {
 		size, err := targetCon.Read(buf)
 		if err != nil {
-			s.logger.Warning("Client disconnect with error: " + err.Error())
+			if err != io.EOF && err == net.ErrClosed {
+				s.logger.Warning("Client disconnect with error: " + err.Error())
+			}
 			closeConnection(s.dispatcher, requestId)
 			return
 		}
 		if size == 0 {
-			s.logger.Warning("Client disconnect")
+			s.logger.Debug("Client disconnect")
 			closeConnection(s.dispatcher, requestId)
 			return
 		}
@@ -150,7 +153,7 @@ func NewServerTunnel(
 		detector:   detector,
 		running:    false,
 		tonnelConn: nil,
-		localAddr:  cfg.RemoteHost + ":" + strconv.Itoa(cfg.RemotePort),
+		localAddr:  cfg.LocalHost + ":" + strconv.Itoa(cfg.LocalPort),
 		logger:     logger,
 	}
 }
