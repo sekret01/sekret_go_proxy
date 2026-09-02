@@ -11,4 +11,6 @@ type Config struct {
 	FramerType    string `yaml:"framer_type"`
 
 	LoggerLevel string `yaml:"log_level"`
+
+	Key32Bytes string `yaml:"key_32_bytes"`
 }
