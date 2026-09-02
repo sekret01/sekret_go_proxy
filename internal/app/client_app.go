@@ -20,6 +20,10 @@ func (p *ClientApp) Run() {
 	p.tunnel.Start()
 }
 
+func (p *ClientApp) Stop() {
+	p.tunnel.Stop()
+}
+
 func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess := true
 

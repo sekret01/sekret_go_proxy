@@ -2,8 +2,8 @@
 
 set PROJECT_PATH=%cd%
 set BUILD_PATH=%PROJECT_PATH%\build\
-set BIN_PATH=%cd%\build\_bin
-set CONFIGS_PATH=%cd%\build\_configs
+set BIN_PATH=%cd%\build\_result_win
+set CONFIGS_PATH=%BIN_PATH%\configs
 
 echo path: %BUILD_PATH%
 

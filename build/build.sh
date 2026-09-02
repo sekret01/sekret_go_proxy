@@ -2,8 +2,8 @@
 
 PROJECT_PATH=$(pwd)
 BUILD_PATH="${PROJECT_PATH}/build/"
-BIN_PATH="${PROJECT_PATH}/build/_bin"
-CONFIGS_PATH="${PROJECT_PATH}/build/_configs"
+BIN_PATH="${PROJECT_PATH}/build/_result_lin"
+CONFIGS_PATH="${BIN_PATH}/configs"
 
 echo "path: ${BUILD_PATH}"
 

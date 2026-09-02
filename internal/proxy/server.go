@@ -22,8 +22,8 @@ type ServerTunnel struct {
 
 	logger logger.Logger
 
-	tonnelConn net.Conn // Туннельное подключение к серверу
-	running    bool     // Состояние работы
+	// tonnelConn net.Conn // Туннельное подключение к серверу TODO make list of connections for .Close()
+	running bool // Состояние работы
 }
 
 // Запуск сервера приема данных
@@ -44,17 +44,17 @@ func (s *ServerTunnel) Start() error {
 				return nil
 			}
 		}
-		s.tonnelConn = con
-		go s.tunnelReader()
+		// s.tonnelConn = con
+		go s.tunnelReader(con)
 	}
 }
 
 // Чтение, обработка и перессылка данных с клиентских узлов
-func (s *ServerTunnel) tunnelReader() {
+func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn) {
 	s.logger.Info("[tunnelReader] Start tunnel listening")
 
 	for {
-		frame, err := ReadFrameFromConnection(s.tonnelConn, s.framer)
+		frame, err := ReadFrameFromConnection(tunnelConn, s.framer)
 		if err != nil {
 			s.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 			return
@@ -74,7 +74,7 @@ func (s *ServerTunnel) tunnelReader() {
 				continue
 			}
 			s.dispatcher.Register(requestId, targetCon, core.ProtoTest, true)
-			go s.targetConnectinoHandler(requestId, targetCon)
+			go s.targetConnectinoHandler(tunnelConn, requestId, targetCon)
 		case core.MsgData:
 			conWrapper, ok := s.dispatcher.Find(requestId)
 			if !ok {
@@ -97,7 +97,7 @@ func (s *ServerTunnel) tunnelReader() {
 }
 
 // Чтение ответов из подключения к target-серверу
-func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn) {
+func (s *ServerTunnel) targetConnectinoHandler(tunnelConn net.Conn, requestId core.RequestID, targetCon net.Conn) {
 	s.logger.Debug("Create new connection: " + targetCon.RemoteAddr().String())
 
 	buf := make([]byte, 32*1024)
@@ -115,11 +115,11 @@ func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetC
 			closeConnection(s.dispatcher, requestId)
 			return
 		}
-		s.sendIntoTunnel(requestId, core.MsgData, buf[:size])
+		s.sendIntoTunnel(tunnelConn, requestId, core.MsgData, buf[:size])
 	}
 }
 
-func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
+func (s *ServerTunnel) sendIntoTunnel(tunnelConn net.Conn, requestId core.RequestID, msgType core.MessageType, payload []byte) error {
 	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
 	payloadEncode := s.encryptor.Encrypt([]byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
@@ -127,14 +127,19 @@ func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
-	_, err = s.tonnelConn.Write(frame)
+	// conWrapper, ok := s.dispatcher.Find(requestId)
+	// if !ok {
+	// 	s.logger.Debug("[sendIntoTunnel] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
+	// 	return nil
+	// }
+	_, err = tunnelConn.Write(frame)
 	s.logger.Debug("[sendIntoTunnel] Data has been sent")
 	return nil
 }
 
-func (s *ServerTunnel) sendCloseIntoTunnel(requestId core.RequestID) {
+func (s *ServerTunnel) sendCloseIntoTunnel(tunnelConn net.Conn, requestId core.RequestID) {
 	s.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
-	s.sendIntoTunnel(requestId, core.MsgClose, []byte{})
+	s.sendIntoTunnel(tunnelConn, requestId, core.MsgClose, []byte{})
 }
 
 func NewServerTunnel(
@@ -152,8 +157,8 @@ func NewServerTunnel(
 		dispatcher: dispatcher,
 		detector:   detector,
 		running:    false,
-		tonnelConn: nil,
-		localAddr:  cfg.LocalHost + ":" + strconv.Itoa(cfg.LocalPort),
-		logger:     logger,
+		// tonnelConn: nil,
+		localAddr: cfg.LocalHost + ":" + strconv.Itoa(cfg.LocalPort),
+		logger:    logger,
 	}
 }

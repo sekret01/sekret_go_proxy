@@ -3,6 +3,8 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -27,12 +29,17 @@ type ClientTunnel struct {
 
 	logger logger.Logger
 
-	serverTonnelConn net.Conn // Туннельное подключение к серверу
-	running          bool     // Состояние работы
+	serverTonnelConn net.Conn     // Туннельное подключение к серверу
+	listener         net.Listener // Слушатель внешних поключений
+	running          bool         // Состояние работы
 }
 
 // Запуск соединения между клиентом и удаленным узлом
 func (c *ClientTunnel) Start() error {
+	if c.running {
+		c.logger.Warning("[Start] Trying to start running service, return")
+		return nil
+	}
 	conn, err := c.transport.Dial(c.remoteAddr)
 	c.logger.Info("Start listen on " + c.localAddr)
 	if err != nil {
@@ -40,7 +47,7 @@ func (c *ClientTunnel) Start() error {
 		return err
 	}
 	c.serverTonnelConn = conn
-
+	c.running = true
 	go c.tunnelReader()
 
 	listener, err := c.transport.Listen(c.localAddr)
@@ -50,24 +57,40 @@ func (c *ClientTunnel) Start() error {
 	return c.connectionsListener(listener)
 }
 
+func (c *ClientTunnel) Stop() {
+	if !c.running {
+		c.logger.Warning("[Stop] Trying to stop stopped service, return")
+		return
+	}
+	c.serverTonnelConn.Close()
+	c.serverTonnelConn = nil
+	c.listener.Close()
+	c.running = false
+}
+
 func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
-	for {
-		requestConn, err := listener.Accept()
+	c.listener = listener
+	for c.running {
+		requestConn, err := c.listener.Accept()
 		if err != nil {
-			c.logger.Error("[ClientTunnel] ERR: connectino accept -> " + err.Error())
 			if c.running {
 				continue
 			} else {
+				c.logger.Info("[ClientTunnel] Close listener (" + err.Error() + ")")
 				return err
 			}
 		}
 		go c.newConnectionHandler(requestConn)
 	}
+	return nil
 }
 
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
 func (c *ClientTunnel) newConnectionHandler(requestConn net.Conn) {
+	if !c.running {
+		return
+	}
 	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
 
 	reader := bufio.NewReader(requestConn)
@@ -169,7 +192,7 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 	defer c.dispatcher.Delete(requestId)
 
 	buf := make([]byte, 32*1024)
-	for {
+	for c.running {
 		size, err := requestConn.Read(buf)
 		if err != nil {
 			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
@@ -189,10 +212,15 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 func (c *ClientTunnel) tunnelReader() {
 	c.logger.Info("[tunnelReader] Start tunnel listening")
 
-	for {
+	for c.running {
 		frame, err := ReadFrameFromConnection(c.serverTonnelConn, c.framer)
 		if err != nil {
-			c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
+			if errors.Is(err, net.ErrClosed) {
+				c.logger.Info("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
+			} else {
+				c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
+				fmt.Printf("%#v\n", err)
+			}
 			return
 		}
 		data, msgType, requestId, err := c.framer.Unframe(frame)
@@ -237,6 +265,9 @@ func (c *ClientTunnel) tunnelReader() {
 }
 
 func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
+	if !c.running {
+		return nil
+	}
 	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
 	payloadEncode := c.encryptor.Encrypt([]byte(payload))
 	frame, err := c.framer.Frame(payloadEncode, msgType, requestId)
