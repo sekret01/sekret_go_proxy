@@ -60,7 +60,8 @@ func buildGui() {
 		go clientApp.Run()
 	})
 	buttonStop := widget.NewButton("stop", func() {
-		label.SetText("типо остановился")
+		label.SetText("proxy stopped")
+		go clientApp.Stop()
 	})
 	myWindow.SetContent(container.NewVBox(
 		label,
