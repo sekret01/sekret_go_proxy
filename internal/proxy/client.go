@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"strings"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
@@ -308,8 +307,8 @@ func NewClientTunnel(
 		detector:         detector,
 		running:          false,
 		serverTonnelConn: nil,
-		remoteAddr:       cfg.RemoteHost + ":" + strconv.Itoa(cfg.RemotePort),
-		localAddr:        cfg.LocalHost + ":" + strconv.Itoa(cfg.LocalPort),
+		remoteAddr:       cfg.RemoteHost,
+		localAddr:        cfg.LocalHost,
 		logger:           logger,
 	}
 }

@@ -3,7 +3,6 @@ package proxy
 import (
 	"io"
 	"net"
-	"strconv"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -127,11 +126,6 @@ func (s *ServerTunnel) sendIntoTunnel(tunnelConn net.Conn, requestId core.Reques
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
-	// conWrapper, ok := s.dispatcher.Find(requestId)
-	// if !ok {
-	// 	s.logger.Debug("[sendIntoTunnel] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
-	// 	return nil
-	// }
 	_, err = tunnelConn.Write(frame)
 	s.logger.Debug("[sendIntoTunnel] Data has been sent")
 	return nil
@@ -157,8 +151,7 @@ func NewServerTunnel(
 		dispatcher: dispatcher,
 		detector:   detector,
 		running:    false,
-		// tonnelConn: nil,
-		localAddr: cfg.LocalHost + ":" + strconv.Itoa(cfg.LocalPort),
-		logger:    logger,
+		localAddr:  cfg.LocalHost,
+		logger:     logger,
 	}
 }

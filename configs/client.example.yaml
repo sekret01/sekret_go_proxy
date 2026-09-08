@@ -1,10 +1,10 @@
 localhost: 
-localport: 
 remotehost: 
-remoteport: 
 
 transport_type: 
 encryptor_type: 
 framer_type: 
 
 log_level: 
+
+key_32_bytes: 
