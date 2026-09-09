@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -39,21 +40,26 @@ func (c *ClientTunnel) Start() error {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
-	conn, err := c.transport.Dial(c.remoteAddr)
-	c.logger.Info("Start listen on " + c.localAddr)
-	if err != nil {
-		c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
-		return err
-	}
-	c.serverTonnelConn = conn
-	c.running = true
-	go c.tunnelReader()
+	for {
+		conn, err := c.waitConnectionToTunnel()
+		// conn, err := c.transport.Dial(c.remoteAddr)
+		c.logger.Info("Start listen on " + c.localAddr)
+		if err != nil {
+			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
+			return err
+		}
+		c.serverTonnelConn = conn
+		c.running = true
+		go c.tunnelReader()
 
-	listener, err := c.transport.Listen(c.localAddr)
-	if err != nil {
-		return err
+		listener, err := c.transport.Listen(c.localAddr)
+		if err != nil {
+			return err
+		}
+		c.connectionsListener(listener)
+		c.logger.Info("Stop tunnel and connections listening")
 	}
-	return c.connectionsListener(listener)
+
 }
 
 func (c *ClientTunnel) Stop() {
@@ -65,6 +71,18 @@ func (c *ClientTunnel) Stop() {
 	c.serverTonnelConn = nil
 	c.listener.Close()
 	c.running = false
+}
+
+func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
+	c.logger.Info("[WatiConnection] :: waiting tunnel connection")
+	for {
+		conn, err := c.transport.Dial(c.remoteAddr)
+		if err == nil {
+			c.logger.Info("[WatiConnection] :: tunnel found")
+			return conn, nil
+		}
+		time.Sleep(time.Second * 5) // TODO вынести в конфиг
+	}
 }
 
 func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
@@ -215,11 +233,12 @@ func (c *ClientTunnel) tunnelReader() {
 		frame, err := ReadFrameFromConnection(c.serverTonnelConn, c.framer)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
-				c.logger.Info("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
+				c.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
 			} else {
 				c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 				fmt.Printf("%#v\n", err)
 			}
+			c.Stop()
 			return
 		}
 		data, msgType, requestId, err := c.framer.Unframe(frame)
