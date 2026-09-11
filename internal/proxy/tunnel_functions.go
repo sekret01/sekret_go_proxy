@@ -7,7 +7,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]byte, error) { // logger logger.Logger,
+func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]byte, error) {
 	bufHeader := make([]byte, framer.HeaderSize())
 	if _, err := io.ReadFull(serverTonnelConn, bufHeader); err != nil {
 		return nil, err
@@ -16,7 +16,7 @@ func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]b
 	if err != nil {
 		return nil, err
 	}
-	bufPayload := make([]byte, payloadSize) // TODO изменять в конфигах bufSize
+	bufPayload := make([]byte, payloadSize)
 	if _, err := io.ReadFull(serverTonnelConn, bufPayload); err != nil {
 		return nil, err
 	}

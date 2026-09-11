@@ -22,7 +22,7 @@ const (
 // Заголовок: MagicByte(1) | MessageType(1) | ID(16) | Size(4)
 func (n *SimpleFramer) Frame(data []byte, messageType core.MessageType, requestId core.RequestID) ([]byte, error) {
 	headerLen := HEADER_SIZE_LEN
-	totalLen := headerLen + +len(data)
+	totalLen := headerLen + len(data)
 	frame := make([]byte, totalLen)
 	offset := 0
 

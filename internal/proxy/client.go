@@ -263,7 +263,7 @@ func (c *ClientTunnel) tunnelReader() {
 			if len(decryptData) < n {
 				n = len(decryptData)
 			}
-			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 20) + "...]") // TODO 20
+			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 20) + "...]")
 			requestCon.Write(decryptData)
 			if !conWrapper.IsTunnel {
 				dataStr := string(decryptData)

@@ -13,7 +13,7 @@ import (
 )
 
 type ClientApp struct {
-	tunnel proxy.ClientTunnel
+	tunnel *proxy.ClientTunnel
 }
 
 func (p *ClientApp) Run() {
@@ -49,7 +49,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		cfg,
 		logger.GetLoggerHub().WithModule("ClientApp"))
 	return &ClientApp{
-		tunnel: *tunnel,
+		tunnel: tunnel,
 	}, nil
 }
 

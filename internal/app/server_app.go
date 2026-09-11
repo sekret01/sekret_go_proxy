@@ -13,7 +13,7 @@ import (
 )
 
 type ServerApp struct {
-	tunnel proxy.ServerTunnel
+	tunnel *proxy.ServerTunnel
 }
 
 func (s *ServerApp) Run() {
@@ -34,7 +34,7 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
-		return nil, core.ErrBuildClientApp
+		return nil, core.ErrBuildServerApp
 	}
 
 	tunnel := proxy.NewServerTunnel(transport,
@@ -45,6 +45,6 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 		cfg,
 		logger.GetLoggerHub().WithModule("ServerApp"))
 	return &ServerApp{
-		tunnel: *tunnel,
+		tunnel: tunnel,
 	}, nil
 }

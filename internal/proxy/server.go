@@ -27,7 +27,6 @@ type ServerTunnel struct {
 	running bool // Состояние работы
 }
 
-// Запуск сервера приема данных
 func (s *ServerTunnel) Start() error {
 	listener, err := s.transport.Listen(s.localAddr)
 	s.logger.Info("Start listen on " + s.localAddr)
@@ -45,12 +44,10 @@ func (s *ServerTunnel) Start() error {
 				return nil
 			}
 		}
-		// s.tonnelConn = con
 		go s.tunnelReader(con)
 	}
 }
 
-// Чтение, обработка и перессылка данных с клиентских узлов
 func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn) {
 	s.logger.Info("[tunnelReader] Start tunnel listening")
 
@@ -97,7 +94,6 @@ func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn) {
 	}
 }
 
-// Чтение ответов из подключения к target-серверу
 func (s *ServerTunnel) targetConnectinoHandler(tunnelConn net.Conn, requestId core.RequestID, targetCon net.Conn) {
 	s.logger.Debug("Create new connection: " + targetCon.RemoteAddr().String())
 
