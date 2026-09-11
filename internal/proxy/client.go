@@ -242,11 +242,11 @@ func (c *ClientTunnel) tunnelReader() {
 			return
 		}
 		data, msgType, requestId, err := c.framer.Unframe(frame)
-		decryptData := c.encryptor.Decrypt(data)
 		if err != nil {
 			c.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
 			continue
 		}
+		decryptData := c.encryptor.Decrypt(data)
 
 		conWrapper, ok := c.dispatcher.Find(requestId)
 		requestCon := conWrapper.Conn
