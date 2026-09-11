@@ -49,3 +49,9 @@ build/_result_lin/configs
 # Windows
 build/_result_lin/configs
 ```
+
+## Дополнительная информация 
+
+- [Архитектура](/docs/ARCHITECTURE.md)
+- [Протокол](/docs/PROTOCOLS.md)
+- [Разработка своих модулей](/docs/DEVELOPMENT.md)
