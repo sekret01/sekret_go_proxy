@@ -24,6 +24,7 @@ type ClientTunnel struct {
 	framer     core.Framer     // Оборачивание и парсинг самописных протоколов
 	dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
 	detector   core.Detector   // Определение протокола
+	auth       core.Auth
 
 	remoteAddr string // Адрес удаленного узла для подключения
 	localAddr  string // Адрес текущего узла
@@ -44,16 +45,21 @@ func (c *ClientTunnel) Start() error {
 	}
 	for {
 		conn, err := c.waitConnectionToTunnel()
-		// conn, err := c.transport.Dial(c.remoteAddr)
-		c.logger.Info("Start listen on " + c.localAddr)
 		if err != nil {
 			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
+			return err
+		}
+		c.logger.Info("Try authenticate")
+		_, err = c.auth.ClientHandshake(conn)
+		if err != nil {
+			c.logger.Error(err.Error())
 			return err
 		}
 		c.serverTonnelConn = conn
 		c.running = true
 		go c.tunnelReader()
 
+		c.logger.Info("Start listen on " + c.localAddr)
 		listener, err := c.transport.Listen(c.localAddr)
 		if err != nil {
 			return err
@@ -321,7 +327,8 @@ func NewClientTunnel(
 	dispatcher core.Dispatcher,
 	detector core.Detector,
 	cfg *config.Config,
-	logger logger.Logger) *ClientTunnel {
+	logger logger.Logger,
+	auth core.Auth) *ClientTunnel {
 	return &ClientTunnel{
 		transport:        transport,
 		encryptor:        encryptor,
@@ -333,5 +340,6 @@ func NewClientTunnel(
 		remoteAddr:       cfg.RemoteHost,
 		localAddr:        cfg.LocalHost,
 		logger:           logger,
+		auth:             auth,
 	}
 }

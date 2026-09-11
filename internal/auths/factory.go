@@ -30,13 +30,13 @@ func get(key string) (factoryFunc, error) {
 	encr, ex := authMap[key]
 	mu.RUnlock()
 	if !ex {
-		return nil, core.ErrInvalidEncryptKey
+		return nil, core.ErrInvalidAuthKey
 	}
 	return encr, nil
 }
 
-func NewEncryptor(key string, config *config.Config) (core.Auth, error) {
-	factory, err := get(key)
+func NewEncryptor(config *config.Config) (core.Auth, error) {
+	factory, err := get(config.AuthType)
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,7 @@ type ServerTunnel struct {
 	framer     core.Framer     // Оборачивание и парсинг самописных протоколов
 	dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
 	detector   core.Detector   // Определение протокола
+	auth       core.Auth
 
 	localAddr string // Адрес текущего узла
 
@@ -33,7 +34,6 @@ func (s *ServerTunnel) Start() error {
 	if err != nil {
 		return err
 	}
-	// TODO нужен ли FOR, подумать об аутентификации
 	for {
 		con, err := listener.Accept()
 		if err != nil {
@@ -49,7 +49,13 @@ func (s *ServerTunnel) Start() error {
 }
 
 func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn) {
-	s.logger.Info("[tunnelReader] Start tunnel listening")
+	s.logger.Info("[tunnelReader] Start tunnel listening with " + tunnelConn.RemoteAddr().String())
+
+	_, err := s.auth.ServerHandshake(tunnelConn)
+	if err != nil {
+		s.logger.Error(err.Error())
+	}
+	s.logger.Debug("[tunnelReader] auth success")
 
 	for {
 		frame, err := ReadFrameFromConnection(tunnelConn, s.framer)
@@ -143,7 +149,8 @@ func NewServerTunnel(
 	dispatcher core.Dispatcher,
 	detector core.Detector,
 	cfg *config.Config,
-	logger logger.Logger) *ServerTunnel {
+	logger logger.Logger,
+	auth core.Auth) *ServerTunnel {
 	return &ServerTunnel{
 		transport:  transport,
 		encryptor:  encryptor,
@@ -153,5 +160,6 @@ func NewServerTunnel(
 		running:    false,
 		localAddr:  cfg.LocalHost,
 		logger:     logger,
+		auth:       auth,
 	}
 }

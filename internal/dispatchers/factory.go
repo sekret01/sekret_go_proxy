@@ -30,7 +30,7 @@ func get(key string) (factoryFunc, error) {
 	encr, ex := dispatchersMap[key]
 	mu.RUnlock()
 	if !ex {
-		return nil, core.ErrInvalidEncryptKey
+		return nil, core.ErrInvalidDispatcherKey
 	}
 	return encr, nil
 }

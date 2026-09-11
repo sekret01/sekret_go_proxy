@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/sekret01/sekret_go_proxy/internal/auths"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/detectors"
@@ -31,6 +32,8 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	dispatcher, err := dispatchers.NewDispatcher(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
+	auth, err := auths.NewEncryptor(cfg)
+	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
 
 	if !buildSuccess {
@@ -44,7 +47,8 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 		dispatcher,
 		detector,
 		cfg,
-		logger.GetLoggerHub().WithModule("ServerApp"))
+		logger.GetLoggerHub().WithModule("ServerApp"),
+		auth)
 	return &ServerApp{
 		tunnel: tunnel,
 	}, nil
