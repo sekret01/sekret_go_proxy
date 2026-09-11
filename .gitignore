@@ -5,3 +5,14 @@
 # TMP
 *.tmp
 *.tmp.*
+
+# configs
+client.yaml
+server.yaml
+
+# build
+build/*
+
+!build.bat
+!build.sh
+
