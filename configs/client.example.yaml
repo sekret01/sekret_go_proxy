@@ -4,6 +4,7 @@ remotehost:
 transport_type: 
 encryptor_type: 
 framer_type: 
+dispatcher_type: 
 
 log_level: 
 

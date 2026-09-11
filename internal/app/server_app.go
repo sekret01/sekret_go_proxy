@@ -29,7 +29,8 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	framer, err := framers.NewFramer(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
-	dispatcher := dispatchers.NewDispatcher()
+	dispatcher, err := dispatchers.NewDispatcher(cfg)
+	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
 
 	if !buildSuccess {
