@@ -62,7 +62,7 @@ func (n *SimpleFramer) Unframe(data []byte) ([]byte, core.MessageType, core.Requ
 		return nil, core.MsgError, core.RequestID{}, core.ErrInsufficientPayloadLensth
 	}
 
-	payload := data[offset:]
+	payload := data[offset : offset+int(dataSize)]
 	return payload, msgType, requestId, nil
 }
 

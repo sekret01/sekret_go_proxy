@@ -28,11 +28,11 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess := true
 
 	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, cfg)
-	buildSuccess = isContinue(err)
+	buildSuccess = buildSuccess && isContinue(err)
 	transport, err := transports.NewTransport(cfg)
-	buildSuccess = isContinue(err)
+	buildSuccess = buildSuccess && isContinue(err)
 	framer, err := framers.NewFramer(cfg)
-	buildSuccess = isContinue(err)
+	buildSuccess = buildSuccess && isContinue(err)
 	dispatcher := dispatchers.NewDispatcher()
 	detector := detectors.NewDetector()
 
