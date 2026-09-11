@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
@@ -28,6 +29,7 @@ type ClientTunnel struct {
 	localAddr  string // Адрес текущего узла
 
 	logger logger.Logger
+	mutex  sync.Mutex
 
 	serverTonnelConn net.Conn     // Туннельное подключение к серверу
 	listener         net.Listener // Слушатель внешних поключений
@@ -293,6 +295,8 @@ func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		c.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	_, err = c.serverTonnelConn.Write(frame)
 	c.logger.Debug("[sendIntoTunnel] Data has been sent")
 	return nil

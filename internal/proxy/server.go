@@ -3,6 +3,7 @@ package proxy
 import (
 	"io"
 	"net"
+	"sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -20,6 +21,7 @@ type ServerTunnel struct {
 	localAddr string // Адрес текущего узла
 
 	logger logger.Logger
+	mutex  sync.Mutex
 
 	// tonnelConn net.Conn // Туннельное подключение к серверу TODO make list of connections for .Close()
 	running bool // Состояние работы
@@ -126,6 +128,8 @@ func (s *ServerTunnel) sendIntoTunnel(tunnelConn net.Conn, requestId core.Reques
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	_, err = tunnelConn.Write(frame)
 	s.logger.Debug("[sendIntoTunnel] Data has been sent")
 	return nil
