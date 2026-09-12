@@ -34,6 +34,7 @@ func (s *ServerTunnel) Start() error {
 	if err != nil {
 		return err
 	}
+	s.running = true
 	for {
 		con, err := listener.Accept()
 		if err != nil {
