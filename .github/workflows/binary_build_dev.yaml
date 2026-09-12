@@ -21,8 +21,8 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=linux GOARCH=amd64 go build -o server-linux-amd64 ./cmd/server
-          GOOS=linux GOARCH=amd64 go build -o client-linux-amd64 ./cmd/client
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server-linux-amd64 ./cmd/server
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o client-linux-amd64 ./cmd/client
 
       - name: Upload Server Artifact
         uses: actions/upload-artifact@v4
