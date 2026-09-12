@@ -27,11 +27,9 @@ jobs:
       - name: Upload Server Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: server-linux-amd64
-          path: server-linux-amd64
+          name: proxy-dev-linux-amd64
+          path: |
+            server-linux-amd64
+            client-linux-amd64
+            configs/
 
-      - name: Upload Client Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: client-linux-amd64
-          path: client-linux-amd64
