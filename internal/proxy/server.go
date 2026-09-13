@@ -45,6 +45,7 @@ func (s *ServerTunnel) Start() error {
 				return nil
 			}
 		}
+		// con.SetReadDeadline(time.Now().Add(time.Second * 60))
 		go s.tunnelReader(con)
 	}
 }
@@ -131,9 +132,13 @@ func (s *ServerTunnel) sendIntoTunnel(tunnelConn net.Conn, requestId core.Reques
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
+	s.logger.Debug("[sendIntoTunnel] Wait mutex: [ " + utils.RequestIdToString(requestId) + " ]")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	s.logger.Debug("[sendIntoTunnel] Mutex closed: [ " + utils.RequestIdToString(requestId) + " ]")
 	_, err = tunnelConn.Write(frame)
+	// s.mutex.Unlock()
+	s.logger.Debug("[sendIntoTunnel] Mutex opened: [ " + utils.RequestIdToString(requestId) + " ]")
 	s.logger.Debug("[sendIntoTunnel] Data has been sent")
 	return nil
 }

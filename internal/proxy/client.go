@@ -45,6 +45,7 @@ func (c *ClientTunnel) Start() error {
 	}
 	for {
 		conn, err := c.waitConnectionToTunnel()
+		// conn.SetReadDeadline(time.Now().Add(time.Second * 60))
 		if err != nil {
 			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
 			return err
