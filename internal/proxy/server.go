@@ -192,7 +192,7 @@ func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		s.logger.Debug("[sendIntoTunnel] Data has been put into writeChannel")
 		return nil
 	case <-time.After(time.Second * 5):
-		s.logger.Error("[sendIntoTunnel] writeChannel is full")
+		s.logger.Error("[sendIntoTunnel] writeChannel [" + utils.RequestIdToString(requestId) + "] is full")
 	}
 	return nil
 }
