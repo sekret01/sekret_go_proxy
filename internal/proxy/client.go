@@ -45,7 +45,6 @@ func (c *ClientTunnel) Start() error {
 	}
 	for {
 		conn, err := c.waitConnectionToTunnel()
-		// conn.SetReadDeadline(time.Now().Add(time.Second * 60))
 		if err != nil {
 			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
 			return err
@@ -302,8 +301,8 @@ func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		c.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	// c.mutex.Lock()
+	// defer c.mutex.Unlock()
 	_, err = c.serverTonnelConn.Write(frame)
 	c.logger.Debug("[sendIntoTunnel] Data has been sent")
 	return nil
