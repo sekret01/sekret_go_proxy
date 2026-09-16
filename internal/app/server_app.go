@@ -17,8 +17,20 @@ type ServerApp struct {
 	tunnel *proxy.ServerTunnel
 }
 
-func (s *ServerApp) Run() {
+func (s *ServerApp) Start() {
 	s.tunnel.Start()
+}
+
+func (p *ServerApp) Stop() error {
+	return p.tunnel.Stop()
+}
+
+func (p *ServerApp) GetInfo() string {
+	return "Server App"
+}
+
+func (p *ServerApp) Users() []string {
+	return []string{}
 }
 
 func NewServerApp(cfg *config.Config) (*ServerApp, error) {

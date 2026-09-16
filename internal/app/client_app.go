@@ -17,12 +17,20 @@ type ClientApp struct {
 	tunnel *proxy.ClientTunnel
 }
 
-func (p *ClientApp) Run() {
-	p.tunnel.Start()
+func (p *ClientApp) Start() error {
+	return p.tunnel.Start()
 }
 
-func (p *ClientApp) Stop() {
-	p.tunnel.Stop()
+func (p *ClientApp) Stop() error {
+	return p.tunnel.Stop()
+}
+
+func (p *ClientApp) GetInfo() string {
+	return "Client App"
+}
+
+func (p *ClientApp) Users() []string {
+	return []string{}
 }
 
 func NewClientApp(cfg *config.Config) (*ClientApp, error) {

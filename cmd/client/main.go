@@ -32,7 +32,7 @@ func main() {
 	client := builClientApp(hub, cfg)
 
 	hub.Info("RUN CLIENT-APP")
-	client.Run()
+	client.Start()
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {

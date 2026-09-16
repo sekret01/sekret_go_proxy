@@ -23,12 +23,14 @@ type ServerTunnel struct {
 	detector   core.Detector   // Определение протокола
 	auth       core.Auth
 
-	localAddr string // Адрес текущего узла
+	localAddr       string       // Адрес текущего узла
+	mainListener    net.Listener // Слушатель внешних подключений
+	connectionsList []net.Conn   // Список подключений
 
-	logger       logger.Logger
-	mutex        sync.Mutex
-	chanMutex    sync.RWMutex
-	writeChannel chan []byte
+	logger    logger.Logger
+	connMutex sync.Mutex
+	chanMutex sync.RWMutex
+	// writeChannel chan []byte
 	connChannels chanMap
 	running      bool // Состояние работы
 }
@@ -40,8 +42,9 @@ func (s *ServerTunnel) Start() error {
 		return err
 	}
 	s.running = true
+	s.mainListener = listener
 	for {
-		con, err := listener.Accept()
+		con, err := s.mainListener.Accept()
 		if err != nil {
 			s.logger.Error("[ServerTunnel] Error in connection accept -> " + err.Error())
 			if s.running {
@@ -51,9 +54,28 @@ func (s *ServerTunnel) Start() error {
 			}
 		}
 		writeChannel := make(chan []byte, 100)
+		s.connectionsList = append(s.connectionsList, con)
 		go s.tunnelWriter(con, writeChannel)
 		go s.tunnelReader(con, writeChannel)
 	}
+}
+
+func (s *ServerTunnel) Stop() error {
+	if !s.running {
+		s.logger.Warning("[Stop] Trying to stop stopped service, return")
+		return nil
+	}
+	for id, reqChan := range s.connChannels {
+		close(reqChan)
+		delete(s.connChannels, id)
+	}
+	for _, conn := range s.connectionsList {
+		conn.Close()
+	}
+	s.connectionsList = nil
+	s.connectionsList = []net.Conn{}
+	s.mainListener.Close()
+	return nil
 }
 
 func (s *ServerTunnel) tunnelWriter(tunnelConn net.Conn, writeChannel chan []byte) {
@@ -231,7 +253,7 @@ func NewServerTunnel(
 		localAddr:    cfg.LocalHost,
 		logger:       logger,
 		auth:         auth,
-		writeChannel: make(chan []byte, 100),
 		connChannels: make(chanMap, 0),
+		// writeChannel: make(chan []byte, 100),
 	}
 }

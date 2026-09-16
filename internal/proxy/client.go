@@ -70,15 +70,16 @@ func (c *ClientTunnel) Start() error {
 
 }
 
-func (c *ClientTunnel) Stop() {
+func (c *ClientTunnel) Stop() error {
 	if !c.running {
 		c.logger.Warning("[Stop] Trying to stop stopped service, return")
-		return
+		return nil
 	}
 	c.serverTonnelConn.Close()
 	c.serverTonnelConn = nil
 	c.listener.Close()
 	c.running = false
+	return nil
 }
 
 func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {

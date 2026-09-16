@@ -57,7 +57,7 @@ func buildGui() {
 	label := widget.NewLabel("proxy stopped")
 	buttonStart := widget.NewButton("start", func() {
 		label.SetText("proxy running...")
-		go clientApp.Run()
+		go clientApp.Start()
 	})
 	buttonStop := widget.NewButton("stop", func() {
 		label.SetText("proxy stopped")
