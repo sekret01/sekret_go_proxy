@@ -3,6 +3,7 @@ package config
 type Config struct {
 	LocalHost  string `yaml:"localhost"`
 	RemoteHost string `yaml:"remotehost"`
+	AdminHost  string `yaml:"adminhost"`
 
 	TransportType  string `yaml:"transport_type"`
 	EncryptorType  string `yaml:"encryptor_type"`

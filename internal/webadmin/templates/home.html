@@ -1,0 +1,77 @@
+{{ define "content" }}
+<div class="home">
+    <style>
+        .control {
+            display: flex;
+            gap: 15px;
+            margin: 0 auto;
+        }
+        .status {
+            display: flex;
+            gap: 15px;
+            background-color: #0b0b0e;
+            border: 1;
+            border-color: #5e5d5d;
+            border-style: solid;
+            padding: 0 10px;
+        }
+        .status-running {
+            color: greenyellow;
+        }
+        .status-stopped {
+            color: red;
+        }
+        button {
+            background-color: #141416;
+            color: #edf5fc;
+            border: 1;
+            border-color: #5e5d5d;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-style: solid;
+            padding: 15px 15px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background-color: #dee1ff;
+            color: #110f16;
+            border: 1;
+            border-color: #dee1ff;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-style: solid;
+            padding: 15px 15px;
+        }
+    </style>
+    <div class="title">
+        <h1>HOME</h1>
+    </div>
+    <div class="control">
+        <form method="POST" action="{{ if .Status }}/api/stop{{ else }}/api/start{{ end }}" style="display:inline;">
+            <button type="submit" class="control_btn">
+                {{ if .Status }}turn on{{ else }}turn off{{ end }}
+            </button>
+        </form>
+        <form method="GET" action="/home" style="display:inline;">
+            <button type="submit" class="mini_btn">↻</button>
+        </form>
+        <div class="status">
+            <p class="{{ if .Status }}status-running{{ else }}status-stopped{{ end }}">
+                {{ if .Status }}• running{{ else }}• stopped{{ end }}
+            </p>
+        </div>
+    </div>
+    <div class="info">
+        <p>Update time: {{ .Time }}</p>
+        <p>Info: {{ .Info }}</p>
+    </div>
+    
+
+    
+    
+    
+</div>
+
+{{ end }}

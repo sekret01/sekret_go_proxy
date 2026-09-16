@@ -17,12 +17,16 @@ type ServerApp struct {
 	tunnel *proxy.ServerTunnel
 }
 
-func (s *ServerApp) Start() {
-	s.tunnel.Start()
+func (s *ServerApp) Start() error {
+	return s.tunnel.Start()
 }
 
 func (p *ServerApp) Stop() error {
 	return p.tunnel.Stop()
+}
+
+func (p *ServerApp) Status() bool {
+	return p.tunnel.IsRunning()
 }
 
 func (p *ServerApp) GetInfo() string {

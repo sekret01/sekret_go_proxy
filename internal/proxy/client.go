@@ -82,6 +82,10 @@ func (c *ClientTunnel) Stop() error {
 	return nil
 }
 
+func (c *ClientTunnel) IsRunning() bool {
+	return c.running
+}
+
 func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
 	c.logger.Info("[WatiConnection] :: waiting tunnel connection")
 	for {

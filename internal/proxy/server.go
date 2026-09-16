@@ -65,6 +65,7 @@ func (s *ServerTunnel) Stop() error {
 		s.logger.Warning("[Stop] Trying to stop stopped service, return")
 		return nil
 	}
+	s.running = false
 	for id, reqChan := range s.connChannels {
 		close(reqChan)
 		delete(s.connChannels, id)
@@ -76,6 +77,10 @@ func (s *ServerTunnel) Stop() error {
 	s.connectionsList = []net.Conn{}
 	s.mainListener.Close()
 	return nil
+}
+
+func (s *ServerTunnel) IsRunning() bool {
+	return s.running
 }
 
 func (s *ServerTunnel) tunnelWriter(tunnelConn net.Conn, writeChannel chan []byte) {

@@ -1,0 +1,73 @@
+{{ define "layout" }}
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Sekret Proxy — Admin</title>
+        <style>
+            body {
+                margin: 0;
+                background-color: #141416;
+            }
+            .main_border {
+                border-radius: 10px;
+                border: 2px;
+                border-style: solid;
+                border-color: #929292;
+            }
+            h1, h2, h3, h4, h5, h6, a, p {
+                color: #edf5fc;
+                font-family:Arial, Helvetica, sans-serif
+            }
+            header, main, section, footer {
+                width: 100%;
+                margin: 10px 0 10px 0;
+            }
+            nav {
+                max-width: 40%;
+                margin: 0 auto;
+                font-size: 1.25rem;
+                font-weight: bold;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .container {
+                margin: 0 auto;
+                padding: 15px;
+                max-width: 1200px;
+                background-color: #1c1c1f;
+            }
+            .title {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="container main_border">
+                <h3>WEB ADMIN</h3>
+            </div>
+        </header>
+        <main>
+            <section>
+                <div class="container main_border">
+                    {{ template "content" . }}
+                </div>
+            </section>
+        </main>
+        <footer>
+            <div class="container main_border">
+                <nav>
+                    <a href="/home">Главная</a>
+                    <a href="/users">Пользователи</a>
+                    <a href="/config">Настройки</a>
+                    <a href="/logs">Логи</a>
+                </nav>
+            </div>
+        </footer>
+    </body>
+</html>
+{{ end }}

@@ -25,6 +25,10 @@ func (p *ClientApp) Stop() error {
 	return p.tunnel.Stop()
 }
 
+func (p *ClientApp) Status() bool {
+	return p.tunnel.IsRunning()
+}
+
 func (p *ClientApp) GetInfo() string {
 	return "Client App"
 }
