@@ -43,31 +43,34 @@ func (c *ClientTunnel) Start() error {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
-	for {
+	c.running = true
+	for c.running {
 		conn, err := c.waitConnectionToTunnel()
 		if err != nil {
+			c.running = false
 			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
 			return err
 		}
 		c.logger.Info("Try authenticate")
 		_, err = c.auth.ClientHandshake(conn)
 		if err != nil {
+			c.running = false
 			c.logger.Error(err.Error())
 			return err
 		}
 		c.serverTonnelConn = conn
-		c.running = true
 		go c.tunnelReader()
 
 		c.logger.Info("Start listen on " + c.localAddr)
 		listener, err := c.transport.Listen(c.localAddr)
 		if err != nil {
+			c.running = false
 			return err
 		}
 		c.connectionsListener(listener)
 		c.logger.Info("Stop tunnel and connections listening")
 	}
-
+	return nil
 }
 
 func (c *ClientTunnel) Stop() error {
@@ -75,10 +78,10 @@ func (c *ClientTunnel) Stop() error {
 		c.logger.Warning("[Stop] Trying to stop stopped service, return")
 		return nil
 	}
+	c.running = false
 	c.serverTonnelConn.Close()
 	c.serverTonnelConn = nil
 	c.listener.Close()
-	c.running = false
 	return nil
 }
 

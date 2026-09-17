@@ -3,13 +3,13 @@ package main
 import (
 	"os"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
-	"github.com/sekret01/sekret_go_proxy/internal/framers"
-	"github.com/sekret01/sekret_go_proxy/internal/utils"
-
 	"github.com/sekret01/sekret_go_proxy/internal/app"
+	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
+	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
+	"github.com/sekret01/sekret_go_proxy/internal/utils"
+	"github.com/sekret01/sekret_go_proxy/internal/webadmin"
 
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger/loggers"
@@ -31,8 +31,16 @@ func main() {
 	hub.Info("START BUILD CLIENT-APP MODULS")
 	client := builClientApp(hub, cfg)
 
-	hub.Info("RUN CLIENT-APP")
-	client.Start()
+	admin := webadmin.NewAdmin(client)
+	hub.Info("RUN ADMIN-SERVER")
+	err := admin.Start(cfg.AdminHost)
+	if err != nil {
+		hub.Error(err.Error())
+	}
+	select {}
+
+	// hub.Info("RUN CLIENT-APP")
+	// client.Start()
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {
@@ -70,13 +78,13 @@ func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
 	}
 }
 
-func builClientApp(hub logger.LoggerHub, cfg *config.Config) app.ClientApp {
+func builClientApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientApp {
 	client, err := app.NewClientApp(cfg)
 	if err != nil {
 		hub.Critical("[loadConfig]: " + err.Error())
 		criticalExit()
 	}
-	return *client
+	return client
 }
 
 func printRegistrates(hub logger.LoggerHub) {
