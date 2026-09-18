@@ -18,6 +18,7 @@ func (a *Admin) Start(addr string) error {
 	mux := http.NewServeMux()
 	// Сделать кластруктуру ServerRouter для auth и rout
 	mux.HandleFunc("/home", a.auth(a.handlerHome))
+	mux.HandleFunc("/logs", a.auth(a.handlerLogs))
 	mux.HandleFunc("/api/start", a.auth(a.apiStart))
 	mux.HandleFunc("/api/stop", a.auth(a.apiStop))
 	return http.ListenAndServe(addr, mux)

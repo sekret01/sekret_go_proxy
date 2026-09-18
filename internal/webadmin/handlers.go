@@ -1,6 +1,7 @@
 package webadmin
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -17,6 +18,11 @@ func (a *Admin) render(w http.ResponseWriter, page string, data any) {
 	if err := templ.ExecuteTemplate(w, "layout", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func (a *Admin) sendJson(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(data)
 }
 
 func (a *Admin) apiStart(w http.ResponseWriter, r *http.Request) {
@@ -46,6 +52,8 @@ func (a *Admin) handlerHome(w http.ResponseWriter, r *http.Request) {
 	a.render(w, "home.html", data)
 }
 
-func (a *Admin) handlerUsers(w http.ResponseWriter, r *http.Request) {
+func (a *Admin) handlerLogs(w http.ResponseWriter, r *http.Request) {
+	data := a.component.GetLogs()
+	a.sendJson(w, data)
 
 }

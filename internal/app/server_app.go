@@ -37,6 +37,10 @@ func (p *ServerApp) Users() []string {
 	return []string{}
 }
 
+func (p *ServerApp) GetLogs() []logger.LogMessage {
+	return logger.GetLoggerHub().GetLogs()
+}
+
 func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess := true
 

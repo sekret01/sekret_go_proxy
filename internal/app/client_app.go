@@ -37,6 +37,10 @@ func (p *ClientApp) Users() []string {
 	return []string{}
 }
 
+func (p *ClientApp) GetLogs() []logger.LogMessage {
+	return logger.GetLoggerHub().GetLogs()
+}
+
 func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess := true
 
