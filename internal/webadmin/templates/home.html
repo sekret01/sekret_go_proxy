@@ -21,6 +21,9 @@
         .status-stopped {
             color: red;
         }
+        .status-launch {
+            color: orange;
+        }
         button {
             background-color: #141416;
             color: #edf5fc;
@@ -48,18 +51,24 @@
     <div class="title">
         <h1>HOME</h1>
     </div>
-    <div class="control">
-        <form method="POST" action="{{ if .Status }}/api/stop{{ else }}/api/start{{ end }}" style="display:inline;">
+    <div class="control"> 
+        <form method="POST" action="{{ if .Status.IsRunning }}/api/stop{{ else }}/api/start{{ end }}" style="display:inline;">
             <button type="submit" class="control_btn">
-                {{ if .Status }}turn on{{ else }}turn off{{ end }}
+                {{ if .Status.IsRunning }}turn off{{ else }}turn on{{ end }}
             </button>
         </form>
         <form method="GET" action="/home" style="display:inline;">
             <button type="submit" class="mini_btn">↻</button>
         </form>
         <div class="status">
-            <p class="{{ if .Status }}status-running{{ else }}status-stopped{{ end }}">
-                {{ if .Status }}• running{{ else }}• stopped{{ end }}
+            {{ $statusClass := "status-stopped" }}
+            {{ if eq .Status.StatusName "RUNNING"}}
+                {{ $statusClass = "status-running" }}
+            {{ else if eq .Status.StatusName "LAUNCH"}}
+                {{ $statusClass = "status-launch" }}
+            {{ end }}
+            <p class="{{ $statusClass }}">
+                • {{ .Status.StatusName }}
             </p>
         </div>
     </div>

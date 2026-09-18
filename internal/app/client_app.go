@@ -25,8 +25,8 @@ func (p *ClientApp) Stop() error {
 	return p.tunnel.Stop()
 }
 
-func (p *ClientApp) Status() bool {
-	return p.tunnel.IsRunning()
+func (p *ClientApp) Status() *proxy.TunnelStatus {
+	return p.tunnel.GetStatus()
 }
 
 func (p *ClientApp) GetInfo() string {

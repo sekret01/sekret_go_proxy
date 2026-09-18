@@ -20,8 +20,17 @@ type TunnelStatus struct {
 	statusName stringStatus
 }
 
+func (t *TunnelStatus) IsRunning() bool {
+	return t.isRunning
+}
+
+func (t *TunnelStatus) StatusName() stringStatus {
+	return t.statusName
+}
+
 func (t *TunnelStatus) SetLaunch() {
 	t.statusName = LAUNCH
+	t.isRunning = true
 }
 
 func (t *TunnelStatus) SetRunning() {
@@ -32,6 +41,13 @@ func (t *TunnelStatus) SetRunning() {
 func (t *TunnelStatus) SetStopped() {
 	t.statusName = STOPPED
 	t.isRunning = false
+}
+
+func NewTunnelStatus() *TunnelStatus {
+	return &TunnelStatus{
+		isRunning:  false,
+		statusName: STOPPED,
+	}
 }
 
 func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]byte, error) {

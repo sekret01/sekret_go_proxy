@@ -32,7 +32,7 @@ type ServerTunnel struct {
 	chanMutex sync.RWMutex
 	// writeChannel chan []byte
 	connChannels chanMap
-	running      bool // Состояние работы
+	status       *TunnelStatus // Состояние работы
 }
 
 func (s *ServerTunnel) Start() error {
@@ -41,31 +41,33 @@ func (s *ServerTunnel) Start() error {
 	if err != nil {
 		return err
 	}
-	s.running = true
+	s.status.SetLaunch()
 	s.mainListener = listener
 	for {
 		con, err := s.mainListener.Accept()
 		if err != nil {
 			s.logger.Error("[ServerTunnel] Error in connection accept -> " + err.Error())
-			if s.running {
+			if s.status.isRunning {
 				continue
 			} else {
+				s.status.SetStopped()
 				return nil
 			}
 		}
 		writeChannel := make(chan []byte, 100)
 		s.connectionsList = append(s.connectionsList, con)
+		s.status.SetRunning()
 		go s.tunnelWriter(con, writeChannel)
 		go s.tunnelReader(con, writeChannel)
 	}
 }
 
 func (s *ServerTunnel) Stop() error {
-	if !s.running {
+	if !s.status.isRunning {
 		s.logger.Warning("[Stop] Trying to stop stopped service, return")
 		return nil
 	}
-	s.running = false
+	s.status.SetStopped()
 	for id, reqChan := range s.connChannels {
 		close(reqChan)
 		delete(s.connChannels, id)
@@ -80,7 +82,11 @@ func (s *ServerTunnel) Stop() error {
 }
 
 func (s *ServerTunnel) IsRunning() bool {
-	return s.running
+	return s.status.isRunning
+}
+
+func (s *ServerTunnel) GetStatus() *TunnelStatus {
+	return s.status
 }
 
 func (s *ServerTunnel) tunnelWriter(tunnelConn net.Conn, writeChannel chan []byte) {
@@ -254,7 +260,7 @@ func NewServerTunnel(
 		framer:       framer,
 		dispatcher:   dispatcher,
 		detector:     detector,
-		running:      false,
+		status:       NewTunnelStatus(),
 		localAddr:    cfg.LocalHost,
 		logger:       logger,
 		auth:         auth,

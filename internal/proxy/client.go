@@ -32,39 +32,42 @@ type ClientTunnel struct {
 	logger logger.Logger
 	mutex  sync.Mutex
 
-	serverTonnelConn net.Conn     // Туннельное подключение к серверу
-	listener         net.Listener // Слушатель внешних поключений
-	running          bool         // Состояние работы
+	serverTonnelConn net.Conn      // Туннельное подключение к серверу
+	listener         net.Listener  // Слушатель внешних поключений
+	status           *TunnelStatus // Состояние работы
 }
 
 // Запуск соединения между клиентом и удаленным узлом
 func (c *ClientTunnel) Start() error {
-	if c.running {
+	if c.status.isRunning {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
-	c.running = true
-	for c.running {
+
+	c.status.SetLaunch()
+	for c.status.isRunning {
+		c.status.SetLaunch()
 		conn, err := c.waitConnectionToTunnel()
 		if err != nil {
-			c.running = false
+			c.status.SetStopped()
 			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
 			return err
 		}
 		c.logger.Info("Try authenticate")
 		_, err = c.auth.ClientHandshake(conn)
 		if err != nil {
-			c.running = false
+			c.status.SetStopped()
 			c.logger.Error(err.Error())
 			return err
 		}
+		c.status.SetRunning()
 		c.serverTonnelConn = conn
 		go c.tunnelReader()
 
 		c.logger.Info("Start listen on " + c.localAddr)
 		listener, err := c.transport.Listen(c.localAddr)
 		if err != nil {
-			c.running = false
+			c.status.SetStopped()
 			return err
 		}
 		c.connectionsListener(listener)
@@ -74,11 +77,11 @@ func (c *ClientTunnel) Start() error {
 }
 
 func (c *ClientTunnel) Stop() error {
-	if !c.running {
+	if !c.status.isRunning {
 		c.logger.Warning("[Stop] Trying to stop stopped service, cencel")
 		return nil
 	}
-	c.running = false
+	c.status.SetStopped()
 	if c.serverTonnelConn != nil {
 		c.serverTonnelConn.Close()
 		c.serverTonnelConn = nil
@@ -92,7 +95,11 @@ func (c *ClientTunnel) Stop() error {
 }
 
 func (c *ClientTunnel) IsRunning() bool {
-	return c.running
+	return c.status.isRunning
+}
+
+func (c *ClientTunnel) GetStatus() *TunnelStatus {
+	return c.status
 }
 
 func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
@@ -109,10 +116,10 @@ func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
 
 func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 	c.listener = listener
-	for c.running {
+	for c.status.isRunning {
 		requestConn, err := c.listener.Accept()
 		if err != nil {
-			if c.running {
+			if c.status.isRunning {
 				continue
 			} else {
 				c.logger.Info("[ClientTunnel] Close listener (" + err.Error() + ")")
@@ -127,7 +134,7 @@ func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
 func (c *ClientTunnel) newConnectionHandler(requestConn net.Conn) {
-	if !c.running {
+	if !c.status.isRunning {
 		return
 	}
 	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
@@ -231,7 +238,7 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 	defer c.dispatcher.Delete(requestId)
 
 	buf := make([]byte, 32*1024)
-	for c.running {
+	for c.status.isRunning {
 		size, err := requestConn.Read(buf)
 		if err != nil {
 			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
@@ -251,7 +258,7 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 func (c *ClientTunnel) tunnelReader() {
 	c.logger.Info("[tunnelReader] Start tunnel listening")
 
-	for c.running {
+	for c.status.isRunning {
 		frame, err := ReadFrameFromConnection(c.serverTonnelConn, c.framer)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
@@ -305,7 +312,7 @@ func (c *ClientTunnel) tunnelReader() {
 }
 
 func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	if !c.running {
+	if !c.status.isRunning {
 		return nil
 	}
 	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
@@ -349,7 +356,7 @@ func NewClientTunnel(
 		framer:           framer,
 		dispatcher:       dispatcher,
 		detector:         detector,
-		running:          false,
+		status:           NewTunnelStatus(),
 		serverTonnelConn: nil,
 		remoteAddr:       cfg.RemoteHost,
 		localAddr:        cfg.LocalHost,
