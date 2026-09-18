@@ -4,6 +4,7 @@ import "sync"
 
 type Hub struct {
 	loggers []Logger
+	buffer  LogBuffer
 	level   LoggerLevel
 	mu      sync.Mutex
 }
@@ -12,6 +13,17 @@ func (h *Hub) Registrate(logger Logger) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.loggers = append(h.loggers, logger)
+}
+
+func (h *Hub) RegisterBuffer(buffer LogBuffer) {
+	h.buffer = buffer
+}
+
+func (h *Hub) GetLogs() []LogMessage {
+	if h.buffer == nil {
+		return []LogMessage{}
+	}
+	return h.buffer.GetLogs()
 }
 
 func (h *Hub) SetLevel(lvl LoggerLevel) {

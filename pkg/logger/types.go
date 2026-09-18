@@ -2,6 +2,8 @@ package logger
 
 type LoggerHub interface {
 	Registrate(logger Logger)
+	RegisterBuffer(buffer LogBuffer)
+	GetLogs() []LogMessage
 	SetLevel(lvl LoggerLevel)
 	WithModule(module string) Logger
 	Log(lvl LoggerLevel, msg string)
@@ -19,6 +21,10 @@ type Logger interface {
 	Warning(msg string)
 	Error(msg string)
 	Critical(msg string)
+}
+
+type LogBuffer interface {
+	GetLogs() []LogMessage
 }
 
 // CONST
@@ -40,6 +46,13 @@ const (
 	ErrorStr    = "ERROR"
 	CriticalStr = "CRITICAL"
 )
+
+type LogMessage struct {
+	Time  string `json:"time"`
+	Level string `json:"level"`
+	Msg   string `json:"msg"`
+	Count int    `json:"count"`
+}
 
 func GetLevelName(lvl LoggerLevel) string {
 	switch lvl {

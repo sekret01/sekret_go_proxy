@@ -58,6 +58,7 @@ func setupLogger() logger.LoggerHub {
 	bufferLogger := loggers.NewBufferLogger()
 	hub.Registrate(consoleLogger)
 	hub.Registrate(bufferLogger)
+	hub.RegisterBuffer(bufferLogger)
 	hub.SetLevel(logger.INFO)
 	return hub
 }

@@ -7,16 +7,9 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type LogMessage struct {
-	Time  string `json:"time"`
-	Level string `json:"level"`
-	Msg   string `json:"msg"`
-	Count int    `json:"count"`
-}
-
 type BufferLogger struct {
 	mu     sync.Mutex
-	buffer []*LogMessage
+	buffer []*logger.LogMessage
 	maxLen int
 }
 
@@ -28,7 +21,7 @@ func (l *BufferLogger) Log(lvl logger.LoggerLevel, msg string) {
 		return
 	}
 	timeNow := time.Now().Format(time.RFC3339Nano)
-	newLog := &LogMessage{
+	newLog := &logger.LogMessage{
 		Time:  timeNow,
 		Level: logger.GetLevelName(lvl),
 		Msg:   msg,
@@ -36,6 +29,16 @@ func (l *BufferLogger) Log(lvl logger.LoggerLevel, msg string) {
 	}
 	l.buffer = append(l.buffer, newLog)
 	l.validateLen()
+}
+
+func (l *BufferLogger) GetLogs() []logger.LogMessage {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	result := []logger.LogMessage{}
+	for _, msg := range l.buffer {
+		result = append(result, *msg)
+	}
+	return result
 }
 
 func (l *BufferLogger) Debug(msg string)    { l.Log(logger.DEBUG, msg) }
@@ -54,9 +57,9 @@ func (l *BufferLogger) validateLen() {
 	}
 }
 
-func NewBufferLogger() logger.Logger {
+func NewBufferLogger() *BufferLogger {
 	return &BufferLogger{
-		buffer: []*LogMessage{},
+		buffer: []*logger.LogMessage{},
 		maxLen: 100,
 	}
 }
