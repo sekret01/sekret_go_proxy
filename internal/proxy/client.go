@@ -75,13 +75,19 @@ func (c *ClientTunnel) Start() error {
 
 func (c *ClientTunnel) Stop() error {
 	if !c.running {
-		c.logger.Warning("[Stop] Trying to stop stopped service, return")
+		c.logger.Warning("[Stop] Trying to stop stopped service, cencel")
 		return nil
 	}
 	c.running = false
-	c.serverTonnelConn.Close()
-	c.serverTonnelConn = nil
-	c.listener.Close()
+	if c.serverTonnelConn != nil {
+		c.serverTonnelConn.Close()
+		c.serverTonnelConn = nil
+	}
+	if c.listener != nil {
+		c.listener.Close()
+		c.listener = nil
+	}
+	c.logger.Info("[Stop] Stop tunnel")
 	return nil
 }
 
