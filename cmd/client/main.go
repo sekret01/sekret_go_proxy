@@ -55,7 +55,9 @@ func loadConfig(hub logger.LoggerHub) *config.Config {
 func setupLogger() logger.LoggerHub {
 	hub := logger.GetLoggerHub()
 	consoleLogger := loggers.NewConsoleLogger()
+	bufferLogger := loggers.NewBufferLogger()
 	hub.Registrate(consoleLogger)
+	hub.Registrate(bufferLogger)
 	hub.SetLevel(logger.INFO)
 	return hub
 }
