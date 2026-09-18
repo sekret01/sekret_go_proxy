@@ -48,10 +48,10 @@ const (
 )
 
 type LogMessage struct {
-	Time  string `json:"time"`
-	Level string `json:"level"`
-	Msg   string `json:"msg"`
-	Count int    `json:"count"`
+	Time    string `json:"time"`
+	Level   string `json:"level"`
+	Message string `json:"msg"`
+	Count   int    `json:"count"`
 }
 
 func GetLevelName(lvl LoggerLevel) string {

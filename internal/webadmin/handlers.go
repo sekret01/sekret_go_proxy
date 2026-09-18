@@ -16,6 +16,7 @@ func (a *Admin) render(w http.ResponseWriter, page string, data any) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := templ.ExecuteTemplate(w, "layout", data); err != nil {
+		fmt.Printf("[ERROR EXECUTE] Error: %s\n", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -53,7 +54,8 @@ func (a *Admin) handlerHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Admin) handlerLogs(w http.ResponseWriter, r *http.Request) {
-	data := a.component.GetLogs()
-	a.sendJson(w, data)
-
+	data := &LogData{
+		Logs: a.component.GetLogs(),
+	}
+	a.render(w, "logs.html", data)
 }

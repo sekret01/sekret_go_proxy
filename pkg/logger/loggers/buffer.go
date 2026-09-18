@@ -16,16 +16,16 @@ type BufferLogger struct {
 func (l *BufferLogger) Log(lvl logger.LoggerLevel, msg string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if len(l.buffer) > 1 && l.buffer[len(l.buffer)-1].Msg == msg {
+	if len(l.buffer) > 1 && l.buffer[len(l.buffer)-1].Message == msg {
 		l.buffer[len(l.buffer)-1].Count++
 		return
 	}
-	timeNow := time.Now().Format(time.RFC3339Nano)
+	timeNow := time.Now().Format(time.DateTime)
 	newLog := &logger.LogMessage{
-		Time:  timeNow,
-		Level: logger.GetLevelName(lvl),
-		Msg:   msg,
-		Count: 1,
+		Time:    timeNow,
+		Level:   logger.GetLevelName(lvl),
+		Message: msg,
+		Count:   1,
 	}
 	l.buffer = append(l.buffer, newLog)
 	l.validateLen()
