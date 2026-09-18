@@ -1,5 +1,6 @@
 localhost: 
 remotehost: 
+adminhost: 
 
 transport_type: 
 encryptor_type: 
