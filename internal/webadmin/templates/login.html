@@ -1,0 +1,18 @@
+{{ define "content" }}
+<div class="auth">
+    <style>
+
+    </style>
+    <div class="title">
+        <h1>AUTH</h1>
+    </div>
+    <form method="POST" action="/api/login" style="display:inline">
+        <label>login</label>
+        <input name="login" autocomplete="username" required>
+        <label>password</label>
+        <input type="password" name="password" autocomplete="current-password" required>
+        <button type="submit">sing up</button>
+        {{ if .Error }}<div class="error">{{ .Error }}</div>{{ end }}
+    </form>
+</div>
+{{ end }}

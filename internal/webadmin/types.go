@@ -5,6 +5,10 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
+const (
+	sessionCookie = "admin_session"
+)
+
 type HomeData struct {
 	Status *proxy.TunnelStatus `json:"status"`
 	Time   string              `json:"time"`

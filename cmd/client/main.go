@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/app"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
@@ -31,7 +32,7 @@ func main() {
 	hub.Info("START BUILD CLIENT-APP MODULS")
 	client := builClientApp(hub, cfg)
 
-	admin := webadmin.NewAdmin(client)
+	admin := webadmin.NewAdmin(client, cfg, time.Hour)
 	hub.Info("RUN ADMIN-SERVER")
 	err := admin.Start(cfg.AdminHost)
 	if err != nil {

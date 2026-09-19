@@ -26,6 +26,51 @@ func (a *Admin) sendJson(w http.ResponseWriter, data any) {
 	json.NewEncoder(w).Encode(data)
 }
 
+func (a *Admin) handlerLogin(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		if _, ok := a.sessionStore.Get(c.Value); ok {
+			http.Redirect(w, r, "/home", http.StatusSeeOther)
+			return
+		}
+	}
+	a.render(w, "login.html", map[string]string{"Error": ""})
+}
+
+func (a *Admin) apiLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method must be post", http.StatusBadRequest)
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad form input", http.StatusBadRequest)
+	}
+
+	user := r.FormValue("login")
+	password := r.FormValue("password")
+
+	if !a.checkUser(user, password) {
+		w.WriteHeader(http.StatusUnauthorized)
+		a.render(w, "login.html", map[string]string{"Error": "Incorrect login or password"})
+		return
+	}
+
+	token, err := a.sessionStore.Create()
+	if err != nil {
+		http.Error(w, "Internal error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookie,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int((24 * time.Hour).Seconds()),
+		Secure:   false,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	http.Redirect(w, r, "/home", http.StatusSeeOther)
+}
+
 func (a *Admin) apiStart(w http.ResponseWriter, r *http.Request) {
 	err := a.component.Start()
 	if err != nil {

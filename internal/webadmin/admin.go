@@ -1,22 +1,31 @@
 package webadmin
 
 import (
+	"crypto/subtle"
 	"embed"
 	"html/template"
 	"net/http"
+	"time"
+
+	"github.com/sekret01/sekret_go_proxy/internal/config"
 )
 
 //go:embed templates/*.html
 var templateFS embed.FS
 
 type Admin struct {
-	component Controllable
-	tmpl      *template.Template
+	component    Controllable
+	tmpl         *template.Template
+	sessionStore *SessionStore
+	cfg          *config.Config
 }
 
 func (a *Admin) Start(addr string) error {
 	mux := http.NewServeMux()
 	// Сделать кластруктуру ServerRouter для auth и rout
+	mux.HandleFunc("/login", a.handlerLogin)
+	mux.HandleFunc("/api/login", a.apiLogin)
+
 	mux.HandleFunc("/home", a.auth(a.handlerHome))
 	mux.HandleFunc("/logs", a.auth(a.handlerLogs))
 	mux.HandleFunc("/api/start", a.auth(a.apiStart))
@@ -24,9 +33,18 @@ func (a *Admin) Start(addr string) error {
 	return http.ListenAndServe(addr, mux)
 }
 
-func NewAdmin(component Controllable) *Admin {
+func (a *Admin) checkUser(user, password string) bool {
+	if subtle.ConstantTimeCompare([]byte(user), []byte(a.cfg.User)) != 1 {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(password), []byte(a.cfg.Password)) == 1
+}
+
+func NewAdmin(component Controllable, cfg *config.Config, ttl time.Duration) *Admin {
 	return &Admin{
-		component: component,
-		tmpl:      template.Must(template.ParseFS(templateFS, "templates/*.html")),
+		component:    component,
+		tmpl:         template.Must(template.ParseFS(templateFS, "templates/*.html")),
+		sessionStore: NewSessionStore(ttl),
+		cfg:          cfg,
 	}
 }

@@ -14,4 +14,7 @@ type Config struct {
 	LoggerLevel string `yaml:"log_level"`
 
 	Key32Bytes string `yaml:"key_32_bytes"`
+
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 }
