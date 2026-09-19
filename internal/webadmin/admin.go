@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"embed"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 //go:embed templates/*.html
 var templateFS embed.FS
 
+//go:embed static/*
+var staticFS embed.FS
+
 type Admin struct {
 	component    Controllable
 	tmpl         *template.Template
@@ -21,7 +25,14 @@ type Admin struct {
 }
 
 func (a *Admin) Start(addr string) error {
+	sub, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		panic(err)
+	}
+
 	mux := http.NewServeMux()
+
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(sub))))
 	// Сделать кластруктуру ServerRouter для auth и rout
 	mux.HandleFunc("/login", a.handlerLogin)
 	mux.HandleFunc("/api/login", a.apiLogin)
