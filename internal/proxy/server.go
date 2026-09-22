@@ -36,12 +36,13 @@ type ServerTunnel struct {
 }
 
 func (s *ServerTunnel) Start() error {
+	s.status.SetLaunch()
 	listener, err := s.transport.Listen(s.localAddr)
 	s.logger.Info("Start listen on " + s.localAddr)
 	if err != nil {
 		return err
 	}
-	s.status.SetLaunch()
+	s.status.SetRunning()
 	s.mainListener = listener
 	for {
 		con, err := s.mainListener.Accept()
@@ -56,7 +57,6 @@ func (s *ServerTunnel) Start() error {
 		}
 		writeChannel := make(chan []byte, 100)
 		s.connectionsList = append(s.connectionsList, con)
-		s.status.SetRunning()
 		go s.tunnelWriter(con, writeChannel)
 		go s.tunnelReader(con, writeChannel)
 	}

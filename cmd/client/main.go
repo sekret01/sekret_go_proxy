@@ -39,9 +39,6 @@ func main() {
 		hub.Error(err.Error())
 	}
 	select {}
-
-	// hub.Info("RUN CLIENT-APP")
-	// client.Start()
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {
