@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -77,19 +76,17 @@ func (c *ClientTunnel) Start() error {
 }
 
 func (c *ClientTunnel) Stop() error {
-	// if !c.status.isRunning {
-	// 	c.logger.Warning("[Stop] Trying to stop stopped service, cencel")
-	// 	return nil
-	// }
-	res := c.stopListening()
-	c.status.SetStopped()
+	res := c.stopListening(true)
 	return res
 }
 
-func (c *ClientTunnel) stopListening() error {
+func (c *ClientTunnel) stopListening(stopRunning bool) error {
 	if !c.status.isRunning {
 		c.logger.Warning("[stopListening] Trying to stop stopped service, cencel")
 		return nil
+	}
+	if stopRunning {
+		c.status.SetStopped()
 	}
 	if c.serverTonnelConn != nil {
 		c.serverTonnelConn.Close()
@@ -197,6 +194,9 @@ func (c *ClientTunnel) switchProtocol(proto core.ProtocolType, requestConn net.C
 		c.handlerHttpProto(reader, requestConn)
 		requestConn.Close()
 		return
+	default:
+		c.logger.Debug("Protocol not found, close")
+		return
 	}
 }
 
@@ -278,9 +278,8 @@ func (c *ClientTunnel) tunnelReader() {
 				c.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
 			} else {
 				c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
-				fmt.Printf("%#v\n", err)
 			}
-			c.stopListening()
+			c.stopListening(false)
 			return
 		}
 		data, msgType, requestId, err := c.framer.Unframe(frame)

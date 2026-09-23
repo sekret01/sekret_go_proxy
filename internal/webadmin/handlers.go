@@ -6,6 +6,8 @@ import (
 	"html/template"
 	"net/http"
 	"time"
+
+	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
 func (a *Admin) render(w http.ResponseWriter, page string, data any) {
@@ -106,8 +108,13 @@ func (a *Admin) handlerLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Admin) handlerUsers(w http.ResponseWriter, r *http.Request) {
-	data := map[string][]string{
-		"data": a.component.Users(),
+	users := a.component.Users()
+	// TODO в Controllable
+	data := []core.ConnectData{}
+	for _, user := range users {
+		data = append(data, core.ConnectData{
+			Host: user,
+		})
 	}
-	a.sendJson(w, data)
+	a.render(w, "users.html", UsersData{Users: data})
 }

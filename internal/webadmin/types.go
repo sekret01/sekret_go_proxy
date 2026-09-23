@@ -1,6 +1,7 @@
 package webadmin
 
 import (
+	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
@@ -17,4 +18,8 @@ type HomeData struct {
 
 type LogData struct {
 	Logs []logger.LogMessage
+}
+
+type UsersData struct {
+	Users []core.ConnectData
 }

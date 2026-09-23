@@ -1,0 +1,60 @@
+{{ define "content" }}
+<div class="users">
+    <style>
+        .table-wrapper {
+            border-radius: 5px;
+            border: #929292 2px solid;
+            background-color: black;
+            padding: 10px;
+        }
+        .users-table {
+            width: 100%;
+            padding: 10px 5px;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .users-table th,
+        .users-table td{
+            padding: 2px 10px;
+            vertical-align: middle;    
+            font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+            font-size: 0.85rem;
+            color: inherit;
+        }
+        .users-table .table-header th {
+            padding: 20px 10px;
+            font-size: 1.25rem;
+            text-align: center;
+            color: white;
+            background-color: black;
+        }
+        .users-table .host-th, .users-table .host { width: 14%; }
+
+        .users-table .host { color: #ffffff; text-align: center; }
+        .users-table .empty-msg { color: #ffffff; text-align: center }
+
+        .users-data { background-color: black; transition: all 0.1s; }
+        .users-data:hover { background-color: white; }
+        .users-data:hover td { color: black; font-weight: bold; }
+
+
+    </style>
+    <div class="title">
+        <h1>USERS</h1>
+    </div>
+    <div class="table-wrapper">
+        <table class="users-table">
+            <tr class="table-header">
+                <th class="host-th">HOST</th>
+            </tr>
+            <tr class="users-data">
+                {{ range .Users }}
+                <td class="host">{{ .Host }}</th>
+            </tr>
+            {{ else }}
+            <tr><th class="empty-msg">No users</th></tr>
+            {{ end }}
+        </table>
+    </div>
+</div>
+{{ end }}

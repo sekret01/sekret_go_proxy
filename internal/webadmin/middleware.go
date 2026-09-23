@@ -19,6 +19,7 @@ func (a *Admin) auth(f http.HandlerFunc) http.HandlerFunc {
 				MaxAge: -1,
 			})
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
 		}
 		f(w, r)
 	}

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/app"
@@ -19,6 +21,13 @@ import (
 )
 
 func main() {
+
+	go func() {
+		for {
+			fmt.Printf("[##] goroutines: %d\n", runtime.NumGoroutine())
+			time.Sleep(5 * time.Second)
+		}
+	}()
 
 	hub := setupLogger()
 	hub.Info("START APP")
