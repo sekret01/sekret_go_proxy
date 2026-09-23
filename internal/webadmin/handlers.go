@@ -104,3 +104,10 @@ func (a *Admin) handlerLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	a.render(w, "logs.html", data)
 }
+
+func (a *Admin) handlerUsers(w http.ResponseWriter, r *http.Request) {
+	data := map[string][]string{
+		"data": a.component.Users(),
+	}
+	a.sendJson(w, data)
+}

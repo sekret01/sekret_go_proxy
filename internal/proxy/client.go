@@ -77,11 +77,20 @@ func (c *ClientTunnel) Start() error {
 }
 
 func (c *ClientTunnel) Stop() error {
+	// if !c.status.isRunning {
+	// 	c.logger.Warning("[Stop] Trying to stop stopped service, cencel")
+	// 	return nil
+	// }
+	res := c.stopListening()
+	c.status.SetStopped()
+	return res
+}
+
+func (c *ClientTunnel) stopListening() error {
 	if !c.status.isRunning {
-		c.logger.Warning("[Stop] Trying to stop stopped service, cencel")
+		c.logger.Warning("[stopListening] Trying to stop stopped service, cencel")
 		return nil
 	}
-	c.status.SetStopped()
 	if c.serverTonnelConn != nil {
 		c.serverTonnelConn.Close()
 		c.serverTonnelConn = nil
@@ -90,7 +99,7 @@ func (c *ClientTunnel) Stop() error {
 		c.listener.Close()
 		c.listener = nil
 	}
-	c.logger.Info("[Stop] Stop tunnel")
+	c.logger.Info("[stopListening] Stop tunnel listening")
 	return nil
 }
 
@@ -119,6 +128,10 @@ func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 	for c.status.isRunning {
 		requestConn, err := c.listener.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				c.logger.Info("[ClientTunnel] Close listener")
+				return nil
+			}
 			if c.status.isRunning {
 				continue
 			} else {
@@ -267,7 +280,7 @@ func (c *ClientTunnel) tunnelReader() {
 				c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 				fmt.Printf("%#v\n", err)
 			}
-			c.Stop()
+			c.stopListening()
 			return
 		}
 		data, msgType, requestId, err := c.framer.Unframe(frame)

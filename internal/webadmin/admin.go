@@ -41,6 +41,7 @@ func (a *Admin) Start(addr string) error {
 	mux.HandleFunc("/logs", a.auth(a.handlerLogs))
 	mux.HandleFunc("/api/start", a.auth(a.apiStart))
 	mux.HandleFunc("/api/stop", a.auth(a.apiStop))
+	mux.HandleFunc("/users", a.handlerUsers)
 
 	srv := &http.Server{
 		Addr:              addr,
