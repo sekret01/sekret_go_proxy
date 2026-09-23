@@ -89,6 +89,14 @@ func (s *ServerTunnel) GetStatus() *TunnelStatus {
 	return s.status
 }
 
+func (s *ServerTunnel) GetUsers() []string {
+	res := []string{}
+	for _, el := range s.connectionsList {
+		res = append(res, el.RemoteAddr().String())
+	}
+	return res
+}
+
 func (s *ServerTunnel) tunnelWriter(tunnelConn net.Conn, writeChannel chan []byte) {
 	for frame := range writeChannel {
 		_, err := tunnelConn.Write(frame)
@@ -136,6 +144,7 @@ func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn, writeChannel chan []byt
 			}
 			conWrapper.Conn.Close()
 			closeConnection(s.dispatcher, requestId)
+			s.removeConnFromList(requestId)
 		}
 	}
 }
@@ -193,6 +202,7 @@ func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetC
 		s.sendCloseIntoTunnel(requestId, writeChannel)
 		s.closeChannel(requestId)
 		closeConnection(s.dispatcher, requestId)
+		s.removeConnFromList(requestId)
 	}()
 
 	buf := make([]byte, 32*1024)
@@ -243,6 +253,27 @@ func (s *ServerTunnel) closeChannel(requestId core.RequestID) {
 		delete(s.connChannels, requestId)
 	}
 	s.logger.Debug("[closeChannel] close channel for [" + utils.RequestIdToString(requestId) + " ]")
+}
+
+func (s *ServerTunnel) removeConnFromList(requestId core.RequestID) {
+	con, ok := s.dispatcher.Find(requestId)
+	if !ok {
+		return
+	}
+	ind := -1
+	for i, el := range s.connectionsList {
+		if el.RemoteAddr().String() == con.Conn.RemoteAddr().String() {
+			ind = i
+			break
+		}
+	}
+	if ind == -1 {
+		s.logger.Warning("Con not found in list")
+		return
+	}
+	s.connectionsList[ind] = s.connectionsList[len(s.connectionsList)-1]
+	s.connectionsList[len(s.connectionsList)-1] = nil
+	s.connectionsList = s.connectionsList[:len(s.connectionsList)-1]
 }
 
 func NewServerTunnel(

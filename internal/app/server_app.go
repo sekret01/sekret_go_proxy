@@ -34,7 +34,7 @@ func (p *ServerApp) GetInfo() string {
 }
 
 func (p *ServerApp) Users() []string {
-	return []string{}
+	return p.tunnel.GetUsers()
 }
 
 func (p *ServerApp) GetLogs() []logger.LogMessage {
