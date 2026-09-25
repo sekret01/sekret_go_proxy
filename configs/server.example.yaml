@@ -16,5 +16,6 @@ secure:
 
 admin:
   adminhost: 
+  authentication: 
   user: 
   password: 

@@ -30,7 +30,8 @@ type SecureConfig struct {
 }
 
 type AdminConfig struct {
-	AdminHost string `yaml:"adminhost"`
-	User      string `yaml:"user"`
-	Password  string `yaml:"password"`
+	AdminHost      string `yaml:"adminhost"`
+	Authentication string `yaml:"authentication"`
+	User           string `yaml:"user"`
+	Password       string `yaml:"password"`
 }
