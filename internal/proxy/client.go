@@ -324,7 +324,7 @@ func (c *ClientTunnel) tunnelReader() {
 }
 
 func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	if !c.status.isRunning {
+	if !c.status.isRunning || c.serverTonnelConn == nil {
 		return nil
 	}
 	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
