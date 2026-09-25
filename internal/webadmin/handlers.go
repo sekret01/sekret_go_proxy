@@ -76,10 +76,11 @@ func (a *Admin) apiLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Admin) apiStart(w http.ResponseWriter, r *http.Request) {
-	err := a.component.Start()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	// err := a.component.Start()
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// }
+	go a.component.Start()
 	w.Header().Set("Content-Type", "application/json")
 	http.Redirect(w, r, "/home", http.StatusSeeOther)
 }
@@ -90,6 +91,10 @@ func (a *Admin) apiStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	w.Header().Set("Content-Type", "application/json")
+	http.Redirect(w, r, "/home", http.StatusSeeOther)
+}
+
+func (a *Admin) handlerMain(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/home", http.StatusSeeOther)
 }
 

@@ -33,10 +33,10 @@ func (a *Admin) Start(addr string) error {
 	mux := http.NewServeMux()
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(sub))))
-	// Сделать кластруктуру ServerRouter для auth и rout
 	mux.HandleFunc("/login", a.handlerLogin)
 	mux.HandleFunc("/api/login", a.apiLogin)
 
+	mux.HandleFunc("/", a.auth(a.handlerMain))
 	mux.HandleFunc("/home", a.auth(a.handlerHome))
 	mux.HandleFunc("/logs", a.auth(a.handlerLogs))
 	mux.HandleFunc("/api/start", a.auth(a.apiStart))
@@ -52,7 +52,7 @@ func (a *Admin) Start(addr string) error {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
-	return srv.ListenAndServe() // http.ListenAndServe(addr, mux)
+	return srv.ListenAndServe()
 }
 
 func (a *Admin) checkUser(user, password string) bool {
