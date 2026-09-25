@@ -1,16 +1,21 @@
-localhost: 
-remotehost: 
-adminhost: 
+connection:
+  localhost: 
+  remotehost: 
 
-transport_type: 
-encryptor_type: 
-framer_type: 
-dispatcher_type: 
-auth_type: 
+modules:
+  transport_type: 
+  encryptor_type: 
+  framer_type: 
+  dispatcher_type: 
+  auth_type: 
 
-log_level: 
+logs:
+  log_level: 
 
-key_32_bytes: 
+secure:
+  key_32_bytes: 
 
-user: 
-password: 
+admin:
+  adminhost: 
+  user: 
+  password: 
