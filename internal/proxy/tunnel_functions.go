@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type stringStatus string
@@ -18,6 +19,7 @@ const (
 type TunnelStatus struct {
 	isRunning  bool
 	statusName stringStatus
+	logger     logger.Logger
 }
 
 func (t *TunnelStatus) IsRunning() bool {
@@ -29,16 +31,19 @@ func (t *TunnelStatus) StatusName() stringStatus {
 }
 
 func (t *TunnelStatus) SetLaunch() {
+	t.logger.Debug("set LAUNCH")
 	t.statusName = LAUNCH
 	t.isRunning = true
 }
 
 func (t *TunnelStatus) SetRunning() {
+	t.logger.Debug("set RUNNING")
 	t.statusName = RUNNING
 	t.isRunning = true
 }
 
 func (t *TunnelStatus) SetStopped() {
+	t.logger.Debug("set STOPPED")
 	t.statusName = STOPPED
 	t.isRunning = false
 }
@@ -47,6 +52,7 @@ func NewTunnelStatus() *TunnelStatus {
 	return &TunnelStatus{
 		isRunning:  false,
 		statusName: STOPPED,
+		logger:     logger.GetLoggerHub().WithModule("TunnelStatus"),
 	}
 }
 

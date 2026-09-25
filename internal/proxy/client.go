@@ -42,14 +42,13 @@ func (c *ClientTunnel) Start() error {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
-
 	c.status.SetLaunch()
 	for c.status.isRunning {
 		c.status.SetLaunch()
 		conn, err := c.waitConnectionToTunnel()
 		if err != nil {
 			c.status.SetStopped()
-			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
+			c.logger.Warning("[ClientTunnel] :: connect remote addr -> " + err.Error())
 			return err
 		}
 		c.logger.Info("Try authenticate")
@@ -67,6 +66,7 @@ func (c *ClientTunnel) Start() error {
 		listener, err := c.transport.Listen(c.localAddr)
 		if err != nil {
 			c.status.SetStopped()
+			c.logger.Error("Tunnel connection error: " + err.Error())
 			return err
 		}
 		c.connectionsListener(listener)
@@ -110,7 +110,7 @@ func (c *ClientTunnel) GetStatus() *TunnelStatus {
 
 func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
 	c.logger.Info("[WatiConnection] :: waiting tunnel connection")
-	for {
+	for c.status.IsRunning() {
 		conn, err := c.transport.Dial(c.remoteAddr)
 		if err == nil {
 			c.logger.Info("[WatiConnection] :: tunnel found")
@@ -118,6 +118,7 @@ func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
 		}
 		time.Sleep(time.Second * 5) // TODO вынести в конфиг
 	}
+	return nil, core.ErrAppNotRunning
 }
 
 func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
