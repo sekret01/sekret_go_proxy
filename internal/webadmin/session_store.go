@@ -59,7 +59,7 @@ func (s *SessionStore) Get(token string) (Session, bool) {
 
 func (s *SessionStore) Delete(token string) {
 	s.mu.Lock()
-	delete(s.sessions, token)
+	s.deleteSession(token)
 	s.mu.Unlock()
 }
 
@@ -68,11 +68,15 @@ func (s *SessionStore) cleanLoop() {
 	for range t.C {
 		now := time.Now()
 		s.mu.Lock()
-		for k, v := range s.sessions {
-			if now.After(v.ExpiredAt) {
-				s.Delete(k)
+		for token, session := range s.sessions {
+			if now.After(session.ExpiredAt) {
+				s.deleteSession(token)
 			}
 		}
 		s.mu.Unlock()
 	}
+}
+
+func (s *SessionStore) deleteSession(token string) {
+	delete(s.sessions, token)
 }

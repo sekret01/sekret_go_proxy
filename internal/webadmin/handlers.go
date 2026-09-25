@@ -41,9 +41,11 @@ func (a *Admin) handlerLogin(w http.ResponseWriter, r *http.Request) {
 func (a *Admin) apiLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method must be post", http.StatusBadRequest)
+		return
 	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Bad form input", http.StatusBadRequest)
+		return
 	}
 
 	user := r.FormValue("login")
