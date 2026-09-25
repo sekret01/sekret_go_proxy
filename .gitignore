@@ -5,6 +5,7 @@
 # TMP
 *.tmp
 *.tmp.*
+logs
 
 # configs
 client.yaml
