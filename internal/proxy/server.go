@@ -55,8 +55,9 @@ func (s *ServerTunnel) Start() error {
 				return nil
 			}
 		}
-		writeChannel := make(chan []byte, 100)
-		s.connectionsList = append(s.connectionsList, con)
+		// writeChannel := make(chan []byte, 100)
+		writeChannel := NewTunnelChannel()
+		s.addConnToList(con)
 		go s.tunnelWriter(con, writeChannel)
 		go s.tunnelReader(con, writeChannel)
 	}
@@ -97,22 +98,26 @@ func (s *ServerTunnel) GetUsers() []string {
 	return res
 }
 
-func (s *ServerTunnel) tunnelWriter(tunnelConn net.Conn, writeChannel chan []byte) {
-	for frame := range writeChannel {
+func (s *ServerTunnel) tunnelWriter(tunnelConn net.Conn, writeChannel *TunnelChannel) { // writeChannel chan []byte
+	for frame := range writeChannel.Channel {
 		_, err := tunnelConn.Write(frame)
 		if err != nil {
-			s.logger.Error("[tunnelWriter]: write msg error: " + err.Error())
+			s.logger.Error("[tunnelWriter]: write msg error in tunnel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ]: " + err.Error())
+			// close(writeChannel)
 			return
 		}
 	}
 }
 
-func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn, writeChannel chan []byte) {
+func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn, writeChannel *TunnelChannel) { // writeChannel chan []byte
 	s.logger.Info("[tunnelReader] Start tunnel listening with " + tunnelConn.RemoteAddr().String())
 
 	_, err := s.auth.ServerHandshake(tunnelConn)
 	if err != nil {
 		s.logger.Error(err.Error())
+		writeChannel.Close()
+		s.removeConnFromList(tunnelConn)
+		return
 	}
 	s.logger.Debug("[tunnelReader] auth success")
 
@@ -120,6 +125,8 @@ func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn, writeChannel chan []byt
 		frame, err := ReadFrameFromConnection(tunnelConn, s.framer)
 		if err != nil {
 			s.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
+			writeChannel.Close()
+			s.removeConnFromList(tunnelConn)
 			return
 		}
 		data, msgType, requestId, err := s.framer.Unframe(frame)
@@ -144,7 +151,6 @@ func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn, writeChannel chan []byt
 			}
 			conWrapper.Conn.Close()
 			closeConnection(s.dispatcher, requestId)
-			s.removeConnFromList(requestId)
 		}
 	}
 }
@@ -160,7 +166,7 @@ func (s *ServerTunnel) getOrCreateChannel(requestId core.RequestID) chan []byte 
 	return ch
 }
 
-func (s *ServerTunnel) connectAndRegistrate(requestId core.RequestID, decryptData []byte, writeChannel chan []byte) {
+func (s *ServerTunnel) connectAndRegistrate(requestId core.RequestID, decryptData []byte, writeChannel *TunnelChannel) { // writeChannel chan []byte
 	channel := s.getOrCreateChannel(requestId)
 	go func() {
 		targetCon, err := s.transport.Dial(string(decryptData))
@@ -171,7 +177,7 @@ func (s *ServerTunnel) connectAndRegistrate(requestId core.RequestID, decryptDat
 			return
 		}
 		s.dispatcher.Register(requestId, targetCon, core.ProtoTest, true)
-		go s.targetConnectinoHandler(requestId, targetCon, writeChannel)
+		go s.targetConnectinoHandler(requestId, targetCon, writeChannel) // writeChannel chan []byte
 		go s.conChannelReader(requestId, channel, targetCon)
 	}()
 }
@@ -188,7 +194,7 @@ func (s *ServerTunnel) putMessageIntoChannel(requestId core.RequestID, decryptDa
 }
 
 func (s *ServerTunnel) conChannelReader(requestId core.RequestID, channel chan []byte, targetCon net.Conn) {
-	s.logger.Debug("[conChannelReader] start read chan fir [" + utils.RequestIdToString(requestId) + " ]")
+	s.logger.Debug("[conChannelReader] start read chan for [" + utils.RequestIdToString(requestId) + " ]")
 	for data := range channel {
 		s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
 		targetCon.Write(data)
@@ -196,17 +202,17 @@ func (s *ServerTunnel) conChannelReader(requestId core.RequestID, channel chan [
 	s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "] ")
 }
 
-func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, writeChannel chan []byte) {
+func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, writeChannel *TunnelChannel) { // writeChannel chan []byte
 	s.logger.Debug("[targetConnectinoHandler] Create new connection: " + targetCon.RemoteAddr().String())
 	defer func() {
 		s.sendCloseIntoTunnel(requestId, writeChannel)
 		s.closeChannel(requestId)
 		closeConnection(s.dispatcher, requestId)
-		s.removeConnFromList(requestId)
+
 	}()
 
 	buf := make([]byte, 32*1024)
-	for {
+	for writeChannel.IsOpen() {
 		size, err := targetCon.Read(buf)
 		if err != nil {
 			if !(errors.Is(err, net.ErrClosed) || err == io.EOF) {
@@ -222,7 +228,7 @@ func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetC
 	}
 }
 
-func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, writeChannel chan []byte) error {
+func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, writeChannel *TunnelChannel) error { // writeChannel chan []byte
 	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
 	payloadEncode := s.encryptor.Encrypt([]byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
@@ -230,17 +236,21 @@ func (s *ServerTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
+	if !writeChannel.IsOpen() {
+		s.logger.Debug("[sendIntoTunnel] Trying send data in close tunnel-channel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ], cencel")
+		return nil
+	}
 	select {
-	case writeChannel <- frame:
-		s.logger.Debug("[sendIntoTunnel] Data has been put into writeChannel")
+	case writeChannel.Channel <- frame:
+		s.logger.Debug("[sendIntoTunnel] Data has been put into writeChannel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ]")
 		return nil
 	case <-time.After(time.Second * 5):
-		s.logger.Error("[sendIntoTunnel] writeChannel [" + utils.RequestIdToString(requestId) + "] is full")
+		s.logger.Error("[sendIntoTunnel] writeChannel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ] is full")
 	}
 	return nil
 }
 
-func (s *ServerTunnel) sendCloseIntoTunnel(requestId core.RequestID, writeChannel chan []byte) {
+func (s *ServerTunnel) sendCloseIntoTunnel(requestId core.RequestID, writeChannel *TunnelChannel) { // writeChannel chan []byte
 	s.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
 	s.sendIntoTunnel(requestId, core.MsgClose, []byte{}, writeChannel)
 }
@@ -252,17 +262,17 @@ func (s *ServerTunnel) closeChannel(requestId core.RequestID) {
 		close(ch)
 		delete(s.connChannels, requestId)
 	}
-	s.logger.Debug("[closeChannel] close channel for [" + utils.RequestIdToString(requestId) + " ]")
+	s.logger.Debug("[closeChannel] close target-channel for [" + utils.RequestIdToString(requestId) + " ]")
 }
 
-func (s *ServerTunnel) removeConnFromList(requestId core.RequestID) {
-	con, ok := s.dispatcher.Find(requestId)
-	if !ok {
-		return
-	}
+func (s *ServerTunnel) addConnToList(con net.Conn) {
+	s.connectionsList = append(s.connectionsList, con)
+}
+
+func (s *ServerTunnel) removeConnFromList(con net.Conn) {
 	ind := -1
 	for i, el := range s.connectionsList {
-		if el.RemoteAddr().String() == con.Conn.RemoteAddr().String() {
+		if el.RemoteAddr().String() == con.RemoteAddr().String() {
 			ind = i
 			break
 		}

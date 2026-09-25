@@ -1,6 +1,7 @@
 package loggers
 
 import (
+	"slices"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ func (l *BufferLogger) GetLogs() []logger.LogMessage {
 	for _, msg := range l.buffer {
 		result = append(result, *msg)
 	}
+	slices.Reverse(result)
 	return result
 }
 

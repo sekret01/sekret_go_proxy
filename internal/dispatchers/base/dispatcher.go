@@ -21,7 +21,7 @@ type BaseDispatcher struct {
 func (d *BaseDispatcher) Register(id core.RequestID, requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.logger.Debug("Registrate [ " + utils.RequestIdToString(id) + " ]")
+	d.logger.Debug("Registrate [ " + requestConn.LocalAddr().String() + " ] > [ " + utils.RequestIdToString(id) + " ]")
 	d.connections[id] = core.ConnWrapper{
 		ID:        id,
 		Conn:      requestConn,

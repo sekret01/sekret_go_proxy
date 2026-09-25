@@ -10,11 +10,38 @@ import (
 
 type stringStatus string
 
+var channels int = 0
+
 const (
 	STOPPED stringStatus = "STOPPED"
 	LAUNCH  stringStatus = "LAUNCH"
 	RUNNING stringStatus = "RUNNING"
 )
+
+type TunnelChannel struct {
+	Id      int
+	Channel chan []byte
+	isOpen  bool
+}
+
+func (t *TunnelChannel) IsOpen() bool {
+	return t.isOpen
+}
+
+func (t *TunnelChannel) Close() {
+	close(t.Channel)
+	t.isOpen = false
+}
+
+func NewTunnelChannel() *TunnelChannel {
+	ch := &TunnelChannel{
+		Id:      channels,
+		Channel: make(chan []byte, 100),
+		isOpen:  true,
+	}
+	channels++
+	return ch
+}
 
 type TunnelStatus struct {
 	isRunning  bool
