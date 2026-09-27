@@ -19,3 +19,4 @@ admin:
   authentication: 
   user: 
   password: 
+  auto_run_proxy: 

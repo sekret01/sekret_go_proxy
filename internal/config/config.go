@@ -34,4 +34,5 @@ type AdminConfig struct {
 	Authentication string `yaml:"authentication"`
 	User           string `yaml:"user"`
 	Password       string `yaml:"password"`
+	AutoRunProxy   bool   `yaml:"auto_run_proxy"`
 }

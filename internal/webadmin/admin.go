@@ -52,6 +52,10 @@ func (a *Admin) Start(addr string) error {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    1 << 20,
 	}
+
+	if a.cfg.AutoRunProxy {
+		go a.component.Start()
+	}
 	return srv.ListenAndServe()
 }
 
