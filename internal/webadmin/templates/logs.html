@@ -1,0 +1,85 @@
+{{ define "content" }}
+<div class="logs">
+    <style>
+        .table-wrapper {
+            border-radius: 5px;
+            border: #929292 2px solid;
+            background-color: black;
+            padding: 10px;
+        }
+        .log-table {
+            width: 100%;
+            padding: 10px 5px;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .log-table th,
+        .log-table td{
+            padding: 2px 10px;
+            vertical-align: middle;    
+            font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+            font-size: 0.85rem;
+            color: inherit;
+        }
+        .log-table .table-header th {
+            padding: 20px 10px;
+            font-size: 1.25rem;
+            text-align: center;
+            color: white;
+            background-color: black;
+        }
+        .log-table .time-th, .log-table .time { width: 14%; }
+        .log-table .lvl-th, .log-table .lvl { width: 5%; }
+        .log-table .msg-th, .log-table .msg { width: auto; }
+        .log-table .count-th, .log-table .count { width: 5%; }
+
+        /* notes */
+        .log-table .time { color: #777777; text-align: left; }
+        .log-table .lvl { text-align: center; color: white; }
+        .log-table .msg { color: white; }
+        .log-table .count { text-align: center; color: #777777; }
+
+        .log-note { background-color: black; transition: all 0.1s; }
+        .log-note:hover { background-color: white; }
+        .log-note:hover td { color: black; font-weight: bold; }
+
+        .log-table .debug { color: aqua; }
+        .log-table .info { color: greenyellow; }
+        .log-table .warning { color: orange; }
+        .log-table .error, .critical { color: red; }
+    </style>
+    <div class="title">
+        <h1>LOGS</h1>
+    </div>
+    <div class="table-wrapper">
+        <table class="log-table">
+            <tr class="table-header">
+                <th class="time-th">TIME</th>
+                <th class="lvl-th">LEVEL</th>
+                <th class="msg-th">MESSAGE</th>
+                <th class="count-th">COUNT</th>
+            </tr>
+            {{ range .Logs }}
+            {{ $lvlClass := "debug" }}
+            {{ if eq .Level "INFO" }}
+                {{ $lvlClass = "info" }}
+            {{ else if eq .Level "WARNING" }}
+                {{ $lvlClass = "warning" }}
+            {{ else if eq .Level "ERROR" }}
+                {{ $lvlClass = "error" }}
+            {{ else if eq .Level "CRITICAT" }}
+                {{ $lvlClass = "critical" }}
+            {{ end }}
+            <tr class="log-note">
+                <td class="time">{{.Time}}</th>
+                <td class="lvl {{ $lvlClass }}">{{.Level}}</th>
+                <td class="msg">{{.Message}}</th>
+                <td class="count">{{.Count}}</th>
+            </tr>
+            {{ else }}
+            <tr><th>Logs are empty</th></tr>
+            {{ end }}
+        </table>
+    </div>
+</div>
+{{ end }}

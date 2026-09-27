@@ -1,6 +1,6 @@
 # SEKRET GO PROXY
 
-> **version:** 1.0.1
+> **version:** 1.2.0
 
 Двухуровневый прокси с шифрованием и модульной архитектурой.
 
@@ -54,3 +54,4 @@ build/_result_lin/configs
 - [Архитектура](/docs/ARCHITECTURE.md)
 - [Протокол](/docs/PROTOCOLS.md)
 - [Разработка своих модулей](/docs/DEVELOPMENT.md)
+- [API](/docs/API.md)

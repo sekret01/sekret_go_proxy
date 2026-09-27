@@ -1,0 +1,62 @@
+{{ define "content" }}
+<div class="login">
+    <style>
+        .login {
+            max-width: 400px;
+            border: 2px solid #979797;
+            border-radius: 10px;
+            margin: 0 auto;
+            justify-content: center;
+        }
+        .login label { 
+            color: white; 
+            font-weight: bold; 
+            font-size: 1.25rem; 
+        }
+        .login input { 
+            background-color: black; 
+            color: white; 
+            border: 1px solid #979797; 
+            font-size: 1.25rem; 
+            padding: 2px 4px;
+        }
+        .input-block {
+            padding: 10px 5px;
+            max-width: 360px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+        }
+        .wrapper {
+            display: flex;
+            justify-content: center;
+
+        }
+        .error-msg {
+            color: red;
+            margin: 10px;
+            font-size: 1.25rem;
+        }
+
+    </style>
+    <div class="title">
+        <h1>AUTH</h1>
+    </div>
+    <form method="POST" action="/api/login" style="display:inline">
+        <div class="input-block">
+            <label>Login</label>
+            <input name="login" autocomplete="username" required>
+        </div>
+        <div class="input-block">
+            <label>Password</label>
+            <input type="password" name="password" autocomplete="current-password" required>
+        </div>
+        <div class="wrapper">
+            <button type="submit">Sing up</button>
+        </div>
+        <div class="wrapper error-msg">
+            {{ if .Error }}<div class="error">{{ .Error }}</div>{{ end }}
+        </div>
+    </form>
+</div>
+{{ end }}

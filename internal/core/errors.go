@@ -19,4 +19,6 @@ var (
 	ErrInsufficientPayloadLensth = errors.New("Insufficient length to read payload")
 
 	ErrAythFailed = errors.New("Authentication failed")
+
+	ErrAppNotRunning = errors.New("App is not running now")
 )

@@ -2,14 +2,15 @@ package main
 
 import (
 	"os"
-
-	"github.com/sekret01/sekret_go_proxy/internal/config"
-	"github.com/sekret01/sekret_go_proxy/internal/framers"
-	"github.com/sekret01/sekret_go_proxy/internal/utils"
+	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/app"
+	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
+	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
+	"github.com/sekret01/sekret_go_proxy/internal/utils"
+	"github.com/sekret01/sekret_go_proxy/internal/webadmin"
 
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger/loggers"
@@ -31,8 +32,13 @@ func main() {
 	hub.Info("START BUILD SERVER-APP MODULS")
 	server := buildServerApp(hub, cfg)
 
-	hub.Info("RUN SERVER-APP")
-	server.Run()
+	hub.Info("RUN ADMIN-SERVER")
+	admin := webadmin.NewAdmin(server, cfg, time.Hour)
+	err := admin.Start(cfg.AdminHost)
+	if err != nil {
+		hub.Error(err.Error())
+	}
+	select {}
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {
@@ -47,7 +53,12 @@ func loadConfig(hub logger.LoggerHub) *config.Config {
 func setupLogger() logger.LoggerHub {
 	hub := logger.GetLoggerHub()
 	consoleLogger := loggers.NewConsoleLogger()
+	bufferLogger := loggers.NewBufferLogger()
+	fileLogger := loggers.NewFileLogger()
 	hub.Registrate(consoleLogger)
+	hub.Registrate(bufferLogger)
+	hub.Registrate(fileLogger)
+	hub.RegisterBuffer(bufferLogger)
 	hub.SetLevel(logger.INFO)
 	return hub
 }
@@ -70,13 +81,13 @@ func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
 	}
 }
 
-func buildServerApp(hub logger.LoggerHub, cfg *config.Config) app.ServerApp {
+func buildServerApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerApp {
 	server, err := app.NewServerApp(cfg)
 	if err != nil {
 		hub.Critical("[loadConfig]: " + err.Error())
 		criticalExit()
 	}
-	return *server
+	return server
 }
 
 func printRegistrates(hub logger.LoggerHub) {

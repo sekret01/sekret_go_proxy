@@ -1,0 +1,53 @@
+{{ define "layout" }}
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Sekret Proxy — Admin</title>
+        <style>
+            body {
+                margin: 0;
+                background-color: #141416;
+            }
+            header, main, section, footer {
+                width: 100%;
+                margin: 10px 0 10px 0;
+            }
+            nav {
+                max-width: 40%;
+                margin: 0 auto;
+                font-size: 1.25rem;
+                font-weight: bold;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+        </style>
+        <link rel="stylesheet" type="text/css" href="/static/main_style.css">
+    </head>
+    <body>
+        <header>
+            <div class="container main_border">
+                <h3>WEB ADMIN</h3>
+            </div>
+            <div class="container main_border">
+                <nav>
+                    <a href="/home">Главная</a>
+                    <a href="/users">Пользователи</a>
+                    <a href="/home">Настройки</a>
+                    <a href="/logs">Логи</a>
+                </nav>
+            </div>
+        </header>
+        <main>
+            <section>
+                <div class="container main_border">
+                    {{ template "content" . }}
+                </div>
+            </section>
+        </main>
+        <footer>
+        </footer>
+    </body>
+</html>
+{{ end }}

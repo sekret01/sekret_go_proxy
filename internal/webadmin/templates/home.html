@@ -1,0 +1,116 @@
+{{ define "content" }}
+<div class="home">
+    <style>
+        .control {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 0 auto;
+        }
+        .status {
+            background-color: #0b0b0e;
+            border: 1;
+            border-color: #5e5d5d;
+            border-style: solid;
+            padding: 10px 10px;
+        }
+        .control-btn {
+            width: 200px;
+            height: 200px;
+            border: #5e5d5d 2px solid;
+            background-color: #000000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        .control-dot {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: #5c5c5c 5px solid;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        .status-dot {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s;  
+            background-color: #000000; 
+        }
+        .status-lbl {
+            color: #000000;
+            font-size: 1rem;
+            font-weight: bold;
+            opacity: 100%;
+            transition: all 0.3s;  
+        }
+
+        .control-btn:hover {
+            width: 200px;
+            height: 200px;
+            background-color: #181818;
+            border: #fdfdfd 2px solid;
+            border-radius: 50%;
+        }
+        .control-btn:hover .control-dot {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+        }
+
+        .control-btn:hover .status-dot {
+            background-color: #4b4b4b;
+            border-radius: 50%;
+        }
+        .control-btn:hover .status-lbl {
+            font-size: 1rem;
+            font-weight: bold;
+        }
+
+        .status-running { color: greenyellow; }
+        .status-stopped { color: red; }
+        .status-launch { color: orange; }
+
+        .status-running-border { border-color: greenyellow; }
+        .status-stopped-border { border-color: red; }
+        .status-launch-border { border-color: orange; }
+    </style>
+    <div class="title">
+        <h1>HOME</h1>
+    </div>
+    <div class="control"> 
+        <form method="POST" action="{{ if .Status.IsRunning }}/api/stop{{ else }}/api/start{{ end }}" style="display:inline;">
+            <button type="submit" class="control-btn">
+                {{ $statusClassBorder := "status-stopped-border" }}
+                {{ $statusClass := "status-stopped" }}
+                {{ if eq .Status.StatusName "RUNNING"}}
+                    {{ $statusClassBorder = "status-running-border" }}
+                    {{ $statusClass = "status-running" }}
+                {{ else if eq .Status.StatusName "LAUNCH"}}
+                    {{ $statusClassBorder = "status-launch-border" }}
+                    {{ $statusClass = "status-launch" }}
+                {{ end }}
+                <span class="control-dot {{ $statusClassBorder }}">
+                    <span class="status-dot">
+                        <p class="status-lbl {{ $statusClass }}">{{ .Status.StatusName }}</p>
+                    </span>
+                </span>
+            </button>
+        </form>
+    </div>
+    <div class="info">
+        <p>Update time: {{ .Time }}</p>
+        <p>Info: {{ .Info }}</p>
+    </div>
+</div>
+
+{{ end }}

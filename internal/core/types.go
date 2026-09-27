@@ -46,3 +46,7 @@ type ConnWrapper struct {
 	ProtoType ProtocolType // Тип протокола (HTTP, SOCKS5)
 	IsTunnel  bool         // нужно ли держать открытым (HTTP false)
 }
+
+type ConnectData struct {
+	Host string
+}

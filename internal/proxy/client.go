@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -32,58 +31,86 @@ type ClientTunnel struct {
 	logger logger.Logger
 	mutex  sync.Mutex
 
-	serverTonnelConn net.Conn     // Туннельное подключение к серверу
-	listener         net.Listener // Слушатель внешних поключений
-	running          bool         // Состояние работы
+	serverTonnelConn net.Conn      // Туннельное подключение к серверу
+	listener         net.Listener  // Слушатель внешних поключений
+	status           *TunnelStatus // Состояние работы
 }
 
 // Запуск соединения между клиентом и удаленным узлом
 func (c *ClientTunnel) Start() error {
-	if c.running {
+	if c.status.isRunning {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
-	for {
+	c.status.SetLaunch()
+	for c.status.isRunning {
+		c.status.SetLaunch()
 		conn, err := c.waitConnectionToTunnel()
 		if err != nil {
-			c.logger.Error("[ClientTunnel] :: connect remote addr -> " + err.Error())
+			c.status.SetStopped()
+			c.logger.Warning("[ClientTunnel] :: connect remote addr -> " + err.Error())
 			return err
 		}
 		c.logger.Info("Try authenticate")
 		_, err = c.auth.ClientHandshake(conn)
 		if err != nil {
+			c.status.SetStopped()
 			c.logger.Error(err.Error())
 			return err
 		}
+		c.status.SetRunning()
 		c.serverTonnelConn = conn
-		c.running = true
 		go c.tunnelReader()
 
 		c.logger.Info("Start listen on " + c.localAddr)
 		listener, err := c.transport.Listen(c.localAddr)
 		if err != nil {
+			c.status.SetStopped()
+			c.logger.Error("Tunnel connection error: " + err.Error())
 			return err
 		}
 		c.connectionsListener(listener)
 		c.logger.Info("Stop tunnel and connections listening")
 	}
-
+	return nil
 }
 
-func (c *ClientTunnel) Stop() {
-	if !c.running {
-		c.logger.Warning("[Stop] Trying to stop stopped service, return")
-		return
+func (c *ClientTunnel) Stop() error {
+	res := c.stopListening(true)
+	return res
+}
+
+func (c *ClientTunnel) stopListening(stopRunning bool) error {
+	if !c.status.isRunning {
+		c.logger.Warning("[stopListening] Trying to stop stopped service, cencel")
+		return nil
 	}
-	c.serverTonnelConn.Close()
-	c.serverTonnelConn = nil
-	c.listener.Close()
-	c.running = false
+	if stopRunning {
+		c.status.SetStopped()
+	}
+	if c.serverTonnelConn != nil {
+		c.serverTonnelConn.Close()
+		c.serverTonnelConn = nil
+	}
+	if c.listener != nil {
+		c.listener.Close()
+		c.listener = nil
+	}
+	c.logger.Info("[stopListening] Stop tunnel listening")
+	return nil
+}
+
+func (c *ClientTunnel) IsRunning() bool {
+	return c.status.isRunning
+}
+
+func (c *ClientTunnel) GetStatus() *TunnelStatus {
+	return c.status
 }
 
 func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
 	c.logger.Info("[WatiConnection] :: waiting tunnel connection")
-	for {
+	for c.status.IsRunning() {
 		conn, err := c.transport.Dial(c.remoteAddr)
 		if err == nil {
 			c.logger.Info("[WatiConnection] :: tunnel found")
@@ -91,14 +118,19 @@ func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
 		}
 		time.Sleep(time.Second * 5) // TODO вынести в конфиг
 	}
+	return nil, core.ErrAppNotRunning
 }
 
 func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 	c.listener = listener
-	for c.running {
+	for c.status.isRunning {
 		requestConn, err := c.listener.Accept()
 		if err != nil {
-			if c.running {
+			if errors.Is(err, net.ErrClosed) {
+				c.logger.Info("[ClientTunnel] Close listener")
+				return nil
+			}
+			if c.status.isRunning {
 				continue
 			} else {
 				c.logger.Info("[ClientTunnel] Close listener (" + err.Error() + ")")
@@ -113,7 +145,7 @@ func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
 func (c *ClientTunnel) newConnectionHandler(requestConn net.Conn) {
-	if !c.running {
+	if !c.status.isRunning {
 		return
 	}
 	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
@@ -162,6 +194,9 @@ func (c *ClientTunnel) switchProtocol(proto core.ProtocolType, requestConn net.C
 		c.logger.Debug("Get HTTP protocol, handle")
 		c.handlerHttpProto(reader, requestConn)
 		requestConn.Close()
+		return
+	default:
+		c.logger.Debug("Protocol not found, close")
 		return
 	}
 }
@@ -217,7 +252,7 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 	defer c.dispatcher.Delete(requestId)
 
 	buf := make([]byte, 32*1024)
-	for c.running {
+	for c.status.isRunning {
 		size, err := requestConn.Read(buf)
 		if err != nil {
 			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
@@ -237,16 +272,15 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 func (c *ClientTunnel) tunnelReader() {
 	c.logger.Info("[tunnelReader] Start tunnel listening")
 
-	for c.running {
+	for c.status.isRunning {
 		frame, err := ReadFrameFromConnection(c.serverTonnelConn, c.framer)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				c.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
 			} else {
 				c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
-				fmt.Printf("%#v\n", err)
 			}
-			c.Stop()
+			c.stopListening(false)
 			return
 		}
 		data, msgType, requestId, err := c.framer.Unframe(frame)
@@ -291,7 +325,7 @@ func (c *ClientTunnel) tunnelReader() {
 }
 
 func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	if !c.running {
+	if !c.status.isRunning || c.serverTonnelConn == nil {
 		return nil
 	}
 	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
@@ -335,7 +369,7 @@ func NewClientTunnel(
 		framer:           framer,
 		dispatcher:       dispatcher,
 		detector:         detector,
-		running:          false,
+		status:           NewTunnelStatus(),
 		serverTonnelConn: nil,
 		remoteAddr:       cfg.RemoteHost,
 		localAddr:        cfg.LocalHost,
