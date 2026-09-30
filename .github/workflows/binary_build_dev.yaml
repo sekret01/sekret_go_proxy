@@ -1,6 +1,8 @@
 name: Build bins for dev-branch
 
-on: [ push ] 
+on: 
+  push:
+    branches: [ dev ] 
 
 jobs:
   build:
