@@ -61,14 +61,22 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		return nil, core.ErrBuildClientApp
 	}
 
-	tunnel := proxy.NewClientTunnel(transport,
+	tunnelEngin := proxy.NewTunnelEngine(
+		transport,
 		encryptor,
 		framer,
 		dispatcher,
+		cfg,
+		logger.GetLoggerHub().WithModule("TunnelEngine"),
+		auth,
+	)
+
+	tunnel := proxy.NewClientTunnel(
+		tunnelEngin,
 		detector,
 		cfg,
 		logger.GetLoggerHub().WithModule("ClientApp"),
-		auth)
+	)
 	return &ClientApp{
 		tunnel: tunnel,
 	}, nil

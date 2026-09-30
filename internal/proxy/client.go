@@ -7,8 +7,8 @@ import (
 	"io"
 	"net"
 	"strings"
-	"sync"
-	"time"
+
+	// "sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -18,54 +18,35 @@ import (
 
 // Туннель для единого соединения с сервером
 type ClientTunnel struct {
-	transport  core.Transport  // Подключение и передача информации
-	encryptor  core.Encryptor  // Шифрование и расшифровка
-	framer     core.Framer     // Оборачивание и парсинг самописных протоколов
-	dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
-	detector   core.Detector   // Определение протокола
-	auth       core.Auth
+	tunnelEngin *TunnelEngine
+	// dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
+	detector  core.Detector // Определение протокола
+	localAddr string        // Адрес текущего узла
+	logger    logger.Logger
+	listener  net.Listener // Слушатель внешних поключений
+}
 
-	remoteAddr string // Адрес удаленного узла для подключения
-	localAddr  string // Адрес текущего узла
-
-	logger logger.Logger
-	mutex  sync.Mutex
-
-	serverTonnelConn net.Conn      // Туннельное подключение к серверу
-	listener         net.Listener  // Слушатель внешних поключений
-	status           *TunnelStatus // Состояние работы
+func (c *ClientTunnel) GetStatus() *TunnelStatus {
+	return c.tunnelEngin.GetStatus()
 }
 
 // Запуск соединения между клиентом и удаленным узлом
 func (c *ClientTunnel) Start() error {
-	if c.status.isRunning {
+	if c.tunnelEngin.IsRunning() {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
-	c.status.SetLaunch()
-	for c.status.isRunning {
-		c.status.SetLaunch()
-		conn, err := c.waitConnectionToTunnel()
+	c.tunnelEngin.SetLaunch() // TODO сделать отедльные функции в TunnelEngine
+	for c.tunnelEngin.IsRunning() {
+		err := c.tunnelEngin.ConnectToTunnel()
 		if err != nil {
-			c.status.SetStopped()
-			c.logger.Warning("[ClientTunnel] :: connect remote addr -> " + err.Error())
 			return err
 		}
-		c.logger.Info("Try authenticate")
-		_, err = c.auth.ClientHandshake(conn)
-		if err != nil {
-			c.status.SetStopped()
-			c.logger.Error(err.Error())
-			return err
-		}
-		c.status.SetRunning()
-		c.serverTonnelConn = conn
-		go c.tunnelReader()
 
 		c.logger.Info("Start listen on " + c.localAddr)
-		listener, err := c.transport.Listen(c.localAddr)
+		listener, err := c.tunnelEngin.transport.Listen(c.localAddr)
 		if err != nil {
-			c.status.SetStopped()
+			c.tunnelEngin.SetStopped()
 			c.logger.Error("Tunnel connection error: " + err.Error())
 			return err
 		}
@@ -76,61 +57,24 @@ func (c *ClientTunnel) Start() error {
 }
 
 func (c *ClientTunnel) Stop() error {
-	res := c.stopListening(true)
-	return res
-}
-
-func (c *ClientTunnel) stopListening(stopRunning bool) error {
-	if !c.status.isRunning {
-		c.logger.Warning("[stopListening] Trying to stop stopped service, cencel")
-		return nil
-	}
-	if stopRunning {
-		c.status.SetStopped()
-	}
-	if c.serverTonnelConn != nil {
-		c.serverTonnelConn.Close()
-		c.serverTonnelConn = nil
-	}
+	res := c.tunnelEngin.stopListening(true)
 	if c.listener != nil {
 		c.listener.Close()
 		c.listener = nil
 	}
-	c.logger.Info("[stopListening] Stop tunnel listening")
-	return nil
-}
-
-func (c *ClientTunnel) IsRunning() bool {
-	return c.status.isRunning
-}
-
-func (c *ClientTunnel) GetStatus() *TunnelStatus {
-	return c.status
-}
-
-func (c *ClientTunnel) waitConnectionToTunnel() (net.Conn, error) {
-	c.logger.Info("[WatiConnection] :: waiting tunnel connection")
-	for c.status.IsRunning() {
-		conn, err := c.transport.Dial(c.remoteAddr)
-		if err == nil {
-			c.logger.Info("[WatiConnection] :: tunnel found")
-			return conn, nil
-		}
-		time.Sleep(time.Second * 5) // TODO вынести в конфиг
-	}
-	return nil, core.ErrAppNotRunning
+	return res
 }
 
 func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 	c.listener = listener
-	for c.status.isRunning {
+	for c.tunnelEngin.IsRunning() {
 		requestConn, err := c.listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				c.logger.Info("[ClientTunnel] Close listener")
 				return nil
 			}
-			if c.status.isRunning {
+			if c.tunnelEngin.IsRunning() {
 				continue
 			} else {
 				c.logger.Info("[ClientTunnel] Close listener (" + err.Error() + ")")
@@ -145,7 +89,7 @@ func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
 func (c *ClientTunnel) newConnectionHandler(requestConn net.Conn) {
-	if !c.status.isRunning {
+	if !c.tunnelEngin.IsRunning() {
 		return
 	}
 	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
@@ -222,13 +166,13 @@ func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Co
 		requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
 		prepTarget := strings.Replace(target, "http://", "", 1)
 		prepTarget = prepTarget[:len(prepTarget)-1] + ":80"
-		c.sendIntoTunnel(requestId, core.MsgConnect, []byte(prepTarget))
+		c.tunnelEngin.sendIntoTunnel(requestId, core.MsgConnect, []byte(prepTarget))
 
 		buf := make([]byte, 32*1024)
 		n, _ := reader.Read(buf)
 		c.logger.Debug("Get http buf: " + utils.BytesToString(buf, 20))
 
-		c.sendIntoTunnel(requestId, core.MsgData, append([]byte(headerFirstString), buf[:n]...))
+		c.tunnelEngin.sendIntoTunnel(requestId, core.MsgData, append([]byte(headerFirstString), buf[:n]...))
 		return
 	}
 }
@@ -237,10 +181,10 @@ func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Co
 func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost string) {
 	c.logger.Debug("[handleTunnelConnect] Start handle for " + targetHost)
 	requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, true)
-	err := c.sendIntoTunnel(requestId, core.MsgConnect, []byte(targetHost))
+	err := c.tunnelEngin.sendIntoTunnel(requestId, core.MsgConnect, []byte(targetHost))
 	if err != nil {
 		requestConn.Close()
-		c.dispatcher.Delete(requestId)
+		c.tunnelEngin.dispatcher.Delete(requestId) // TODO решить что с диспетчером делать
 		return
 	}
 	c.listenFromClientForTunnel(requestId, requestConn)
@@ -249,131 +193,43 @@ func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost stri
 // Цикличное чтение данных с клиента (при HTTPS)
 func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, requestConn net.Conn) {
 	defer requestConn.Close()
-	defer c.dispatcher.Delete(requestId)
+	defer c.tunnelEngin.dispatcher.Delete(requestId)
 
 	buf := make([]byte, 32*1024)
-	for c.status.isRunning {
+	for c.tunnelEngin.IsRunning() {
 		size, err := requestConn.Read(buf)
 		if err != nil {
 			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
-			c.sendCloseIntoTunnel(requestId)
+			c.tunnelEngin.sendCloseIntoTunnel(requestId)
 			return
 		}
 		if size == 0 {
 			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect")
-			c.sendCloseIntoTunnel(requestId)
+			c.tunnelEngin.sendCloseIntoTunnel(requestId)
 			return
 		}
-		c.sendIntoTunnel(requestId, core.MsgData, buf[:size])
+		c.tunnelEngin.sendIntoTunnel(requestId, core.MsgData, buf[:size])
 	}
-}
-
-// Чтение, обработка и перессылка данных с сервера
-func (c *ClientTunnel) tunnelReader() {
-	c.logger.Info("[tunnelReader] Start tunnel listening")
-
-	for c.status.isRunning {
-		frame, err := ReadFrameFromConnection(c.serverTonnelConn, c.framer)
-		if err != nil {
-			if errors.Is(err, net.ErrClosed) {
-				c.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
-			} else {
-				c.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
-			}
-			c.stopListening(false)
-			return
-		}
-		data, msgType, requestId, err := c.framer.Unframe(frame)
-		if err != nil {
-			c.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
-			continue
-		}
-		decryptData := c.encryptor.Decrypt(data)
-
-		conWrapper, ok := c.dispatcher.Find(requestId)
-		requestCon := conWrapper.Conn
-		if !ok {
-			c.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
-			continue
-		}
-		c.logger.Debug("[tunnelReader] Get data [ " + utils.RequestIdToString(requestId) + " ], msg_type: " + utils.MessageTypeToHexString(msgType))
-		switch msgType {
-		case core.MsgData:
-			n := 10
-			if len(decryptData) < n {
-				n = len(decryptData)
-			}
-			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 20) + "...]")
-			requestCon.Write(decryptData)
-			if !conWrapper.IsTunnel {
-				dataStr := string(decryptData)
-				if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
-					strings.Contains(dataStr, "Connection: close") {
-					c.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(requestId) + "]")
-					c.sendCloseIntoTunnel(requestId)
-					closeConnection(c.dispatcher, requestId)
-				}
-
-			}
-		case core.MsgClose:
-			closeConnection(c.dispatcher, requestId)
-		case core.MsgError:
-			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			closeConnection(c.dispatcher, requestId)
-		}
-	}
-}
-
-func (c *ClientTunnel) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	if !c.status.isRunning || c.serverTonnelConn == nil {
-		return nil
-	}
-	c.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
-	payloadEncode := c.encryptor.Encrypt([]byte(payload))
-	frame, err := c.framer.Frame(payloadEncode, msgType, requestId)
-	if err != nil {
-		c.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
-		return err
-	}
-	// c.mutex.Lock()
-	// defer c.mutex.Unlock()
-	_, err = c.serverTonnelConn.Write(frame)
-	c.logger.Debug("[sendIntoTunnel] Data has been sent")
-	return nil
-}
-
-func (c *ClientTunnel) sendCloseIntoTunnel(requestId core.RequestID) {
-	c.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
-	c.sendIntoTunnel(requestId, core.MsgClose, []byte{})
 }
 
 func (c *ClientTunnel) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
 	requestId := core.GenerateID()
-	c.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
+	c.tunnelEngin.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
 	c.logger.Debug("Save conn with UUID " + utils.RequestIdToString(requestId))
 	return requestId
 }
 
 func NewClientTunnel(
-	transport core.Transport,
-	encryptor core.Encryptor,
-	framer core.Framer,
-	dispatcher core.Dispatcher,
+	tunnelEngin *TunnelEngine,
 	detector core.Detector,
 	cfg *config.Config,
 	logger logger.Logger,
-	auth core.Auth) *ClientTunnel {
+) *ClientTunnel {
 	return &ClientTunnel{
-		transport:        transport,
-		encryptor:        encryptor,
-		framer:           framer,
-		dispatcher:       dispatcher,
-		detector:         detector,
-		status:           NewTunnelStatus(),
-		serverTonnelConn: nil,
-		remoteAddr:       cfg.RemoteHost,
-		localAddr:        cfg.LocalHost,
-		logger:           logger,
-		auth:             auth,
+		tunnelEngin: tunnelEngin,
+		detector:    detector,
+		localAddr:   cfg.LocalHost,
+		logger:      logger,
+		listener:    nil,
 	}
 }
