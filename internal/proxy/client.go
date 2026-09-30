@@ -58,11 +58,15 @@ func (c *ClientTunnel) Start() error {
 
 func (c *ClientTunnel) Stop() error {
 	res := c.tunnelEngin.stopListening(true)
+	c.CloseListen()
+	return res
+}
+
+func (c *ClientTunnel) CloseListen() {
 	if c.listener != nil {
 		c.listener.Close()
 		c.listener = nil
 	}
-	return res
 }
 
 func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
@@ -225,11 +229,13 @@ func NewClientTunnel(
 	cfg *config.Config,
 	logger logger.Logger,
 ) *ClientTunnel {
-	return &ClientTunnel{
+	client := &ClientTunnel{
 		tunnelEngin: tunnelEngin,
 		detector:    detector,
 		localAddr:   cfg.LocalHost,
 		logger:      logger,
 		listener:    nil,
 	}
+	tunnelEngin.RegistrateListener(client)
+	return client
 }
