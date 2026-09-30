@@ -1,6 +1,7 @@
 package linux
 
 import (
+	"fmt"
 	"os"
 	"unsafe"
 
@@ -23,19 +24,22 @@ type LinuxPacketDevice struct {
 func (d *LinuxPacketDevice) CreateTun(name string) error {
 	fd, err := unix.Open(devPath, unix.O_RDWR|unix.O_CLOEXEC, 0)
 	if err != nil {
+		fmt.Println("[!][CreateTun]: error in open file: " + err.Error())
 		return err
 	}
-	var ifreq [unix.IFNAMSIZE + 64]byte // IFNAMSIZ
+	var ifreq [unix.IFNAMSIZ + 64]byte // IFNAMSIZ
 	copy(ifreq[:], name)
-	*(*uint16)(unsafe.Pointer(&ifreq[unix.IFNAMSIZE])) = unix.IFF_TUN | unix.IFF_NO_PI
+	*(*uint16)(unsafe.Pointer(&ifreq[unix.IFNAMSIZ])) = unix.IFF_TUN | unix.IFF_NO_PI
 
 	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), tunSetIff, uintptr(unsafe.Pointer(&ifreq[0])))
 	if errno != 0 {
+		fmt.Printf("[!][CreateTun]: error in syscal, num: %d\n", errno)
 		unix.Close(fd)
 		return nil
 	}
 	d.file = os.NewFile(uintptr(fd), name)
 	d.isActive = true
+	fmt.Println("[!][CreateTun]: tun0 opend")
 	return nil
 }
 

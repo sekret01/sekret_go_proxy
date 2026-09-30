@@ -30,7 +30,7 @@ func main() {
 	printRegistrates(hub)
 
 	hub.Info("START BUILD CLIENT-APP MODULS")
-	client := builClientApp(hub, cfg)
+	client := builClientTunApp(hub, cfg) // builClientApp(hub, cfg)
 
 	admin := webadmin.NewAdmin(client, cfg, time.Hour)
 	hub.Info("RUN ADMIN-SERVER")
@@ -81,6 +81,15 @@ func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
 
 func builClientApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientApp {
 	client, err := app.NewClientApp(cfg)
+	if err != nil {
+		hub.Critical("[loadConfig]: " + err.Error())
+		criticalExit()
+	}
+	return client
+}
+
+func builClientTunApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientTunApp {
+	client, err := app.NewClientTunApp(cfg)
 	if err != nil {
 		hub.Critical("[loadConfig]: " + err.Error())
 		criticalExit()
