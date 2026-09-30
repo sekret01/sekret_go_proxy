@@ -1,10 +1,8 @@
 package proxy
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
@@ -27,10 +25,11 @@ func (c *ClientTun) Start() error {
 		c.tunnelEngine.SetStopped()
 		return err
 	}
+	go c.tunnelMessagesReader()
 	for c.tunnelEngine.IsRunning() {
 		err := c.tunnelEngine.ConnectToTunnel()
 		if err != nil {
-			c.CloseListen()
+			c.Stop()
 			return err
 		}
 		c.tunReader()
@@ -40,28 +39,43 @@ func (c *ClientTun) Start() error {
 }
 
 func (c *ClientTun) Stop() error {
-	c.tunnelEngine.stopListening(true)
-	return c.CloseListen()
+	return c.tunnelEngine.stopListening(true)
 }
 
 func (c *ClientTun) GetStatus() *TunnelStatus {
 	return c.tunnelEngine.GetStatus()
 }
 
-func (c *ClientTun) CloseListen() error {
-	return c.packetDevice.Close()
+func (c *ClientTun) CloseListen() {
+	c.packetDevice.Close()
 }
 
 func (c *ClientTun) tunReader() {
-	for {
-		buf := make([]byte, c.packetDevice.MTU())
-		data, err := c.packetDevice.ReadPacket(buf)
+	buf := make([]byte, c.packetDevice.MTU())
+	for c.tunnelEngine.IsRunning() {
+		n, err := c.packetDevice.ReadPacket(buf)
 		if err != nil {
 			c.logger.Error("Error in read tun: " + err.Error())
 			return
 		}
-		fmt.Printf("[>] (%d) %s\n", data, buf)
-		time.Sleep(time.Second)
+		data := buf[:n]
+		c.logger.Debug("[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20))
+		c.tunnelEngine.sendIntoTunnel(core.GetNoopID(), core.MsgPacket, data)
+		// time.Sleep(time.Second)
+	}
+}
+
+func (c *ClientTun) tunnelMessagesReader() {
+	for msg := range c.tunnelEngine.tunnelMessages {
+		if msg.MsgType != core.MsgPacket {
+			continue
+		}
+		_, err := c.packetDevice.WritePacket(msg.Data)
+		if err != nil {
+			c.logger.Warning("[tunnelMessagesReader] write data error: " + err.Error())
+			continue
+		}
+		c.logger.Debug("[tunnelMessagesReader] write data for [ " + utils.RequestIdToString(msg.RequestId) + " ]: " + utils.BytesToString(msg.Data, 20))
 	}
 }
 
@@ -75,5 +89,6 @@ func NewClientTun(
 		packetDevice: packetsDevice,
 		logger:       logger,
 	}
+	tunnelEngin.RegistrateListener(client)
 	return client
 }

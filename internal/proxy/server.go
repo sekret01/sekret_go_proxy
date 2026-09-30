@@ -137,6 +137,8 @@ func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn, writeChannel *TunnelCha
 		}
 
 		switch msgType {
+		case core.MsgPacket:
+			s.logger.Info("Packet get")
 		case core.MsgConnect:
 			s.connectAndRegistrate(requestId, decryptData, writeChannel)
 		case core.MsgData:

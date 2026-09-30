@@ -35,6 +35,7 @@ const (
 	MsgData    MessageType = 2
 	MsgClose   MessageType = 3
 	MsgError   MessageType = 4
+	MsgPacket  MessageType = 5
 )
 
 // STRUCTS

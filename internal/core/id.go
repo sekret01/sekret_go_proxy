@@ -11,3 +11,8 @@ func GenerateID() RequestID {
 	}
 	return id
 }
+
+func GetNoopID() RequestID {
+	id := (RequestID)(make([]byte, 16))
+	return id
+}
