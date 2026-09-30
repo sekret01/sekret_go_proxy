@@ -20,10 +20,11 @@ import (
 type ClientTunnel struct {
 	tunnelEngin *TunnelEngine
 	// dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
-	detector  core.Detector // Определение протокола
-	localAddr string        // Адрес текущего узла
-	logger    logger.Logger
-	listener  net.Listener // Слушатель внешних поключений
+	detector   core.Detector // Определение протокола
+	dispatcher core.Dispatcher
+	localAddr  string // Адрес текущего узла
+	logger     logger.Logger
+	listener   net.Listener // Слушатель внешних поключений
 }
 
 func (c *ClientTunnel) GetStatus() *TunnelStatus {
@@ -50,6 +51,7 @@ func (c *ClientTunnel) Start() error {
 			c.logger.Error("Tunnel connection error: " + err.Error())
 			return err
 		}
+		go c.listenTunnelMessages()
 		c.connectionsListener(listener)
 		c.logger.Info("Stop tunnel and connections listening")
 	}
@@ -188,7 +190,7 @@ func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost stri
 	err := c.tunnelEngin.sendIntoTunnel(requestId, core.MsgConnect, []byte(targetHost))
 	if err != nil {
 		requestConn.Close()
-		c.tunnelEngin.dispatcher.Delete(requestId) // TODO решить что с диспетчером делать
+		c.dispatcher.Delete(requestId) // TODO решить что с диспетчером делать
 		return
 	}
 	c.listenFromClientForTunnel(requestId, requestConn)
@@ -197,7 +199,7 @@ func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost stri
 // Цикличное чтение данных с клиента (при HTTPS)
 func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, requestConn net.Conn) {
 	defer requestConn.Close()
-	defer c.tunnelEngin.dispatcher.Delete(requestId)
+	defer c.dispatcher.Delete(requestId)
 
 	buf := make([]byte, 32*1024)
 	for c.tunnelEngin.IsRunning() {
@@ -216,9 +218,45 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 	}
 }
 
+func (c *ClientTunnel) listenTunnelMessages() {
+	for msg := range c.tunnelEngin.tunnelMessages {
+		conWrapper, ok := c.dispatcher.Find(msg.RequestId)
+		requestCon := conWrapper.Conn
+		if !ok {
+			c.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+			continue
+		}
+		c.logger.Debug("[tunnelReader] Get data [ " + utils.RequestIdToString(msg.RequestId) + " ], msg_type: " + utils.MessageTypeToHexString(msg.MsgType))
+		switch msg.MsgType {
+		case core.MsgData:
+			n := 10
+			if len(msg.Data) < n {
+				n = len(msg.Data)
+			}
+			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(msg.Data, 20) + "...]")
+			requestCon.Write(msg.Data)
+			if !conWrapper.IsTunnel {
+				dataStr := string(msg.Data)
+				if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
+					strings.Contains(dataStr, "Connection: close") {
+					c.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+					c.tunnelEngin.sendCloseIntoTunnel(msg.RequestId)
+					closeConnection(c.dispatcher, msg.RequestId)
+				}
+
+			}
+		case core.MsgClose:
+			closeConnection(c.dispatcher, msg.RequestId)
+		case core.MsgError:
+			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+			closeConnection(c.dispatcher, msg.RequestId)
+		}
+	}
+}
+
 func (c *ClientTunnel) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
 	requestId := core.GenerateID()
-	c.tunnelEngin.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
+	c.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
 	c.logger.Debug("Save conn with UUID " + utils.RequestIdToString(requestId))
 	return requestId
 }
@@ -226,12 +264,14 @@ func (c *ClientTunnel) generateAndRegistrateId(requestConn net.Conn, protoType c
 func NewClientTunnel(
 	tunnelEngin *TunnelEngine,
 	detector core.Detector,
+	dispatcher core.Dispatcher,
 	cfg *config.Config,
 	logger logger.Logger,
 ) *ClientTunnel {
 	client := &ClientTunnel{
 		tunnelEngin: tunnelEngin,
 		detector:    detector,
+		dispatcher:  dispatcher,
 		localAddr:   cfg.LocalHost,
 		logger:      logger,
 		listener:    nil,

@@ -65,7 +65,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		transport,
 		encryptor,
 		framer,
-		dispatcher,
+		// dispatcher,
 		cfg,
 		logger.GetLoggerHub().WithModule("TunnelEngine"),
 		auth,
@@ -74,6 +74,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	tunnel := proxy.NewClientTunnel(
 		tunnelEngin,
 		detector,
+		dispatcher,
 		cfg,
 		logger.GetLoggerHub().WithModule("ClientApp"),
 	)

@@ -3,7 +3,6 @@ package proxy
 import (
 	"errors"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,11 +18,10 @@ type ClientListener interface {
 
 // Функции взаимодействия с тунелем
 type TunnelEngine struct {
-	transport  core.Transport  // Подключение и передача информации
-	encryptor  core.Encryptor  // Шифрование и расшифровка
-	framer     core.Framer     // Оборачивание и парсинг самописных протоколов
-	dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
-	auth       core.Auth
+	transport core.Transport // Подключение и передача информации
+	encryptor core.Encryptor // Шифрование и расшифровка
+	framer    core.Framer    // Оборачивание и парсинг самописных протоколов
+	auth      core.Auth
 
 	remoteAddr string // Адрес удаленного узла для подключения
 
@@ -31,6 +29,7 @@ type TunnelEngine struct {
 	mutex           sync.Mutex
 	tunnelChan      chan []byte
 	clientListeners []ClientListener
+	tunnelMessages  chan core.MessageData
 
 	serverTonnelConn net.Conn      // Туннельное подключение к серверу
 	status           *TunnelStatus // Состояние работы
@@ -108,7 +107,10 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 		t.serverTonnelConn = nil
 	}
 	t.closeListeners()
+	close(t.tunnelChan)
 	t.tunnelChan = make(chan []byte, 1000)
+	close(t.tunnelMessages)
+	t.tunnelMessages = make(chan core.MessageData, 1000)
 	t.logger.Info("[stopListening] Stop tunnel listening")
 	return nil
 }
@@ -134,38 +136,12 @@ func (t *TunnelEngine) tunnelReader() {
 			continue
 		}
 		decryptData := t.encryptor.Decrypt(data)
-
-		conWrapper, ok := t.dispatcher.Find(requestId)
-		requestCon := conWrapper.Conn
-		if !ok {
-			t.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(requestId) + "]")
-			continue
+		frameData := core.MessageData{
+			MsgType:   msgType,
+			RequestId: requestId,
+			Data:      decryptData,
 		}
-		t.logger.Debug("[tunnelReader] Get data [ " + utils.RequestIdToString(requestId) + " ], msg_type: " + utils.MessageTypeToHexString(msgType))
-		switch msgType {
-		case core.MsgData:
-			n := 10
-			if len(decryptData) < n {
-				n = len(decryptData)
-			}
-			t.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(decryptData, 20) + "...]")
-			requestCon.Write(decryptData)
-			if !conWrapper.IsTunnel {
-				dataStr := string(decryptData)
-				if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
-					strings.Contains(dataStr, "Connection: close") {
-					t.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(requestId) + "]")
-					t.sendCloseIntoTunnel(requestId)
-					closeConnection(t.dispatcher, requestId)
-				}
-
-			}
-		case core.MsgClose:
-			closeConnection(t.dispatcher, requestId)
-		case core.MsgError:
-			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			closeConnection(t.dispatcher, requestId)
-		}
+		t.tunnelMessages <- frameData
 	}
 	t.logger.Error("EXIT FROM READ CYCLE")
 }
@@ -216,7 +192,6 @@ func NewTunnelEngine(
 	transport core.Transport,
 	encryptor core.Encryptor,
 	framer core.Framer,
-	dispatcher core.Dispatcher,
 	cfg *config.Config,
 	logger logger.Logger,
 	auth core.Auth) *TunnelEngine {
@@ -224,13 +199,13 @@ func NewTunnelEngine(
 		transport:        transport,
 		encryptor:        encryptor,
 		framer:           framer,
-		dispatcher:       dispatcher,
 		status:           NewTunnelStatus(),
 		serverTonnelConn: nil,
 		remoteAddr:       cfg.RemoteHost,
 		logger:           logger,
 		tunnelChan:       make(chan []byte, 1000),
 		clientListeners:  make([]ClientListener, 0),
+		tunnelMessages:   make(chan core.MessageData, 1000),
 		auth:             auth,
 	}
 	return engine

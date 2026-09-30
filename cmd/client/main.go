@@ -30,7 +30,7 @@ func main() {
 	printRegistrates(hub)
 
 	hub.Info("START BUILD CLIENT-APP MODULS")
-	client := builClientTunApp(hub, cfg) // builClientApp(hub, cfg)
+	client := builClientApp(hub, cfg) // builClientApp(hub, cfg)    builClientTunApp
 
 	admin := webadmin.NewAdmin(client, cfg, time.Hour)
 	hub.Info("RUN ADMIN-SERVER")

@@ -4,7 +4,6 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
-	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -50,7 +49,7 @@ func NewClientTunApp(cfg *config.Config) (*ClientTunApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	framer, err := framers.NewFramer(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
-	dispatcher, err := dispatchers.NewDispatcher(cfg)
+	// dispatcher, err := dispatchers.NewDispatcher(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
 	auth, err := auths.NewEncryptor(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
@@ -64,7 +63,7 @@ func NewClientTunApp(cfg *config.Config) (*ClientTunApp, error) {
 		transport,
 		encryptor,
 		framer,
-		dispatcher,
+		// dispatcher,
 		cfg,
 		logger.GetLoggerHub().WithModule("TunnelEngine"),
 		auth,

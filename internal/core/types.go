@@ -47,6 +47,12 @@ type ConnWrapper struct {
 	IsTunnel  bool         // нужно ли держать открытым (HTTP false)
 }
 
+type MessageData struct {
+	MsgType   MessageType
+	RequestId RequestID
+	Data      []byte
+}
+
 type ConnectData struct {
 	Host string
 }
