@@ -18,7 +18,7 @@ import (
 )
 
 // Туннель для единого соединения с сервером
-type ClientTunnel struct {
+type ClientProxy struct {
 	tunnelEngin *TunnelEngine
 	// dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
 	detector   core.Detector // Определение протокола
@@ -28,12 +28,12 @@ type ClientTunnel struct {
 	listener   net.Listener // Слушатель внешних поключений
 }
 
-func (c *ClientTunnel) GetStatus() *proxy.TunnelStatus {
+func (c *ClientProxy) GetStatus() *proxy.TunnelStatus {
 	return c.tunnelEngin.GetStatus()
 }
 
 // Запуск соединения между клиентом и удаленным узлом
-func (c *ClientTunnel) Start() error {
+func (c *ClientProxy) Start() error {
 	if c.tunnelEngin.IsRunning() {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
@@ -59,32 +59,32 @@ func (c *ClientTunnel) Start() error {
 	return nil
 }
 
-func (c *ClientTunnel) Stop() error {
+func (c *ClientProxy) Stop() error {
 	res := c.tunnelEngin.stopListening(true)
 	c.CloseListen()
 	return res
 }
 
-func (c *ClientTunnel) CloseListen() {
+func (c *ClientProxy) CloseListen() {
 	if c.listener != nil {
 		c.listener.Close()
 		c.listener = nil
 	}
 }
 
-func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
+func (c *ClientProxy) connectionsListener(listener net.Listener) error {
 	c.listener = listener
 	for c.tunnelEngin.IsRunning() {
 		requestConn, err := c.listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
-				c.logger.Info("[ClientTunnel] Close listener")
+				c.logger.Info("[ClientProxy] Close listener")
 				return nil
 			}
 			if c.tunnelEngin.IsRunning() {
 				continue
 			} else {
-				c.logger.Info("[ClientTunnel] Close listener (" + err.Error() + ")")
+				c.logger.Info("[ClientProxy] Close listener (" + err.Error() + ")")
 				return err
 			}
 		}
@@ -95,7 +95,7 @@ func (c *ClientTunnel) connectionsListener(listener net.Listener) error {
 
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
-func (c *ClientTunnel) newConnectionHandler(requestConn net.Conn) {
+func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 	if !c.tunnelEngin.IsRunning() {
 		return
 	}
@@ -131,7 +131,7 @@ func (c *ClientTunnel) newConnectionHandler(requestConn net.Conn) {
 	c.switchProtocol(proto, requestConn, reader)
 }
 
-func (c *ClientTunnel) switchProtocol(proto core.ProtocolType, requestConn net.Conn, reader *bufio.Reader) {
+func (c *ClientProxy) switchProtocol(proto core.ProtocolType, requestConn net.Conn, reader *bufio.Reader) {
 	switch proto {
 	case core.ProtoUnknown:
 		c.logger.Debug("Get uncknown protocol, close")
@@ -152,7 +152,7 @@ func (c *ClientTunnel) switchProtocol(proto core.ProtocolType, requestConn net.C
 	}
 }
 
-func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Conn) {
+func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Conn) {
 	headerFirstString, err := reader.ReadString('\n')
 	if err != nil {
 		c.logger.Error("[handlerHttpProto] Error in read data: " + err.Error())
@@ -185,7 +185,7 @@ func (c *ClientTunnel) handlerHttpProto(reader *bufio.Reader, requestConn net.Co
 }
 
 // Отрпавление запроса на подключение сервером к targetHost при HTTPS запросе
-func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost string) {
+func (c *ClientProxy) handleTunnelConnect(requestConn net.Conn, targetHost string) {
 	c.logger.Debug("[handleTunnelConnect] Start handle for " + targetHost)
 	requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, true)
 	err := c.tunnelEngin.sendIntoTunnel(requestId, core.MsgConnect, []byte(targetHost))
@@ -198,7 +198,7 @@ func (c *ClientTunnel) handleTunnelConnect(requestConn net.Conn, targetHost stri
 }
 
 // Цикличное чтение данных с клиента (при HTTPS)
-func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, requestConn net.Conn) {
+func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, requestConn net.Conn) {
 	defer requestConn.Close()
 	defer c.dispatcher.Delete(requestId)
 
@@ -219,7 +219,7 @@ func (c *ClientTunnel) listenFromClientForTunnel(requestId core.RequestID, reque
 	}
 }
 
-func (c *ClientTunnel) listenTunnelMessages() {
+func (c *ClientProxy) listenTunnelMessages() {
 	for msg := range c.tunnelEngin.tunnelMessages {
 		conWrapper, ok := c.dispatcher.Find(msg.RequestId)
 		requestCon := conWrapper.Conn
@@ -255,21 +255,21 @@ func (c *ClientTunnel) listenTunnelMessages() {
 	}
 }
 
-func (c *ClientTunnel) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
+func (c *ClientProxy) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
 	requestId := core.GenerateID()
 	c.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
 	c.logger.Debug("Save conn with UUID " + utils.RequestIdToString(requestId))
 	return requestId
 }
 
-func NewClientTunnel(
+func NewClientProxy(
 	tunnelEngin *TunnelEngine,
 	detector core.Detector,
 	dispatcher core.Dispatcher,
 	cfg *config.Config,
 	logger logger.Logger,
-) *ClientTunnel {
-	client := &ClientTunnel{
+) *ClientProxy {
+	client := &ClientProxy{
 		tunnelEngin: tunnelEngin,
 		detector:    detector,
 		dispatcher:  dispatcher,

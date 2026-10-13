@@ -15,7 +15,7 @@ import (
 )
 
 type ClientApp struct {
-	tunnel *client.ClientTunnel
+	tunnel *client.ClientProxy
 }
 
 func (p *ClientApp) Start() error {
@@ -72,7 +72,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		auth,
 	)
 
-	tunnel := client.NewClientTunnel(
+	tunnel := client.NewClientProxy(
 		tunnelEngin,
 		detector,
 		dispatcher,
