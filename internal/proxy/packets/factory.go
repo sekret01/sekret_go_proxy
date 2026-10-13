@@ -3,10 +3,11 @@ package packets
 import (
 	"sync"
 
+	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-type FactoryFunc func() (core.PacketDevice, error)
+type FactoryFunc func(cfg *config.Config) (core.PacketDevice, error)
 
 var (
 	factoryMap map[string]FactoryFunc = map[string]FactoryFunc{}
@@ -32,12 +33,12 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewPacketDevice(osType string) (core.PacketDevice, error) {
+func NewPacketDevice(osType string, cfg *config.Config) (core.PacketDevice, error) {
 	factory, err := get(osType)
 	if err != nil {
 		return nil, err
 	}
-	return factory()
+	return factory(cfg)
 }
 
 func List() []string {

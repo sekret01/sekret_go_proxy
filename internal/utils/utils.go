@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/hex"
+	"errors"
 	"os/exec"
 	"strconv"
 
@@ -42,9 +43,9 @@ func MessageTypeToHexString(msgType core.MessageType) string {
 
 func ShRun(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	_, err := cmd.CombinedOutput()
+	res, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
+		return errors.New("ShRun error: " + err.Error() + " , res: " + string(res))
 	}
 	return nil
 }

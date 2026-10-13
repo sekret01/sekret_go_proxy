@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/app"
@@ -20,6 +23,9 @@ import (
 
 func main() {
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	hub := setupLogger()
 	hub.Info("START APP")
 
@@ -30,15 +36,20 @@ func main() {
 	printRegistrates(hub)
 
 	hub.Info("START BUILD CLIENT-APP MODULS")
-	client := builClientApp(hub, cfg) // builClientApp(hub, cfg)    builClientTunApp
+	client := builClientTunApp(hub, cfg) // builClientApp(hub, cfg)    builClientTunApp
 
 	admin := webadmin.NewAdmin(client, cfg, time.Hour)
 	hub.Info("RUN ADMIN-SERVER")
-	err := admin.Start(cfg.AdminHost)
-	if err != nil {
-		hub.Error(err.Error())
-	}
-	select {}
+	go func() {
+		err := admin.Start(cfg.AdminHost)
+		if err != nil {
+			hub.Error(err.Error())
+		}
+	}()
+
+	<-ctx.Done()
+	hub.Info("shutdown signal")
+	admin.Stop(ctx)
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {

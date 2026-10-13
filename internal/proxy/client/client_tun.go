@@ -40,6 +40,10 @@ func (c *ClientTun) Start() error {
 }
 
 func (c *ClientTun) Stop() error {
+	err := c.packetDevice.Close()
+	if err != nil {
+		c.logger.Error("[Stop]: " + err.Error())
+	}
 	return c.tunnelEngine.stopListening(true)
 }
 
@@ -62,7 +66,6 @@ func (c *ClientTun) tunReader() {
 		data := buf[:n]
 		c.logger.Debug("[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20))
 		c.tunnelEngine.sendIntoTunnel(core.GetNoopID(), core.MsgPacket, data)
-		// time.Sleep(time.Second)
 	}
 }
 

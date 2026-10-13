@@ -1,10 +1,14 @@
 package linux
 
 import (
-	"fmt"
+	"errors"
+	"net"
 	"os"
+	"os/exec"
+	"strings"
 	"unsafe"
 
+	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/packets"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -20,23 +24,18 @@ const (
 type LinuxPacketDevice struct {
 	isActive bool
 	file     *os.File
+	cfg      *config.Config
+	serverIP string
 }
 
 func (d *LinuxPacketDevice) CreateTun(name string) error {
-	if err := d.openVirtualTun(intfName); err != nil {
-		fmt.Println("[!][CreateTun]: error in create virtual tun0: " + err.Error())
-		d.closeVirtualTun(intfName)
+	serverIP, err := getIpFromHost(d.cfg.RemoteHost)
+	if err != nil {
 		return err
 	}
-	if err := d.setRoutes("157.228.153.149", "192.168.0.1"); err != nil { // TODO из конфига / парсить
-		fmt.Println("[!][CreateTun]: error in create virtual tun0: " + err.Error())
-		d.unsetRoutes("157.228.153.149") // TODO из конфига / парсить
-		d.closeVirtualTun(intfName)
-		return err
-	}
+	d.serverIP = serverIP
 	fd, err := unix.Open(devPath, unix.O_RDWR|unix.O_CLOEXEC, 0)
 	if err != nil {
-		fmt.Println("[!][CreateTun]: error in open file: " + err.Error())
 		return err
 	}
 	var ifreq [unix.IFNAMSIZ + 64]byte // IFNAMSIZ
@@ -45,13 +44,20 @@ func (d *LinuxPacketDevice) CreateTun(name string) error {
 
 	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), tunSetIff, uintptr(unsafe.Pointer(&ifreq[0])))
 	if errno != 0 {
-		fmt.Printf("[!][CreateTun]: error in syscal, num: %d\n", errno)
 		unix.Close(fd)
 		return nil
 	}
 	d.file = os.NewFile(uintptr(fd), name)
+	if err := d.openVirtualTun(intfName); err != nil {
+		d.closeVirtualTun(intfName)
+		return err
+	}
+	if err := d.setRoutes(); err != nil { // TODO из конфига / парсить
+		d.unsetRoutes() // TODO из конфига / парсить
+		d.closeVirtualTun(intfName)
+		return err
+	}
 	d.isActive = true
-	fmt.Println("[!][CreateTun]: tun0 opend")
 	return nil
 }
 
@@ -76,18 +82,11 @@ func (d *LinuxPacketDevice) MTU() int {
 }
 
 func (d *LinuxPacketDevice) Close() error {
-	d.unsetRoutes("157.228.153.149") // TODO из конфига / парсить
+	d.unsetRoutes() // TODO из конфига / парсить
 	d.closeVirtualTun(intfName)
 	err := d.file.Close()
 	d.isActive = false
 	return err
-}
-
-func NewLinuxPacketDevice() (core.PacketDevice, error) {
-	return &LinuxPacketDevice{
-			isActive: false,
-		},
-		nil
 }
 
 func (d *LinuxPacketDevice) openVirtualTun(name string) error {
@@ -101,17 +100,17 @@ func (d *LinuxPacketDevice) openVirtualTun(name string) error {
 }
 
 func (d *LinuxPacketDevice) closeVirtualTun(name string) error {
-	if err := utils.ShRun("ip", "addr", "del", "10.0.0.1/24", "dev", name, "2>/dev/null"); err != nil {
-		// return err
-	}
-	if err := utils.ShRun("ip", "link", "set", "dev", name, "down", "2>/dev/null"); err != nil {
-		// return err
-	}
+	utils.ShRun("ip", "addr", "del", "10.0.0.1/24", "dev", name, "2>/dev/null")
+	utils.ShRun("ip", "link", "set", "dev", name, "down", "2>/dev/null")
 	return nil
 }
 
-func (d *LinuxPacketDevice) setRoutes(serverIP, gatewayIP string) error {
-	if err := utils.ShRun("ip", "route", "add", serverIP+"/32", "via", gatewayIP); err != nil {
+func (d *LinuxPacketDevice) setRoutes() error {
+	gatewayIP, err := getDefaultGateway()
+	if err != nil {
+		return err
+	}
+	if err := utils.ShRun("ip", "route", "add", d.serverIP+"/32", "via", gatewayIP); err != nil {
 		return err
 	}
 	if err := utils.ShRun("ip", "route", "add", "0.0.0.0/1", "dev", "tun0"); err != nil {
@@ -120,13 +119,56 @@ func (d *LinuxPacketDevice) setRoutes(serverIP, gatewayIP string) error {
 	return utils.ShRun("ip", "route", "add", "128.0.0.0/1", "dev", "tun0")
 }
 
-func (d *LinuxPacketDevice) unsetRoutes(serverIP string) error {
+func (d *LinuxPacketDevice) unsetRoutes() error {
 	utils.ShRun("ip", "route", "del", "0.0.0.0/1", "dev", "tun0")
 	utils.ShRun("ip", "route", "del", "128.0.0.0/1", "dev", "tun0")
-	utils.ShRun("ip", "route", "del", serverIP+"/32")
+	utils.ShRun("ip", "route", "del", d.serverIP+"/32")
 	return nil
+}
+
+func NewLinuxPacketDevice(cfg *config.Config) (core.PacketDevice, error) {
+	return &LinuxPacketDevice{
+			isActive: false,
+			cfg:      cfg,
+			serverIP: "",
+		},
+		nil
 }
 
 func init() {
 	packets.Registrate("linux", NewLinuxPacketDevice)
+}
+
+func getIpFromHost(host string) (string, error) {
+	h, _, err := net.SplitHostPort(host)
+	if err != nil {
+		h = host
+	}
+	if ip := net.ParseIP(h); ip != nil {
+		return ip.String(), nil
+	}
+	ips, err := net.LookupIP(h)
+	if err != nil {
+		return "", err
+	}
+	for _, ip := range ips {
+		if ip4 := ip.To4(); ip4 != nil {
+			return ip4.String(), nil
+		}
+	}
+	return "", errors.New("Not found any ips")
+}
+
+func getDefaultGateway() (string, error) {
+	out, err := exec.Command("ip", "route", "show", "default").Output()
+	if err != nil {
+		return "", err
+	}
+	fields := strings.Fields(string(out))
+	for i, f := range fields {
+		if f == "via" && i+1 < len(fields) {
+			return fields[i+1], nil
+		}
+	}
+	return "", errors.New("gateway not found")
 }

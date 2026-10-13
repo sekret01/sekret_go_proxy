@@ -70,7 +70,7 @@ func NewClientTunApp(cfg *config.Config) (*ClientTunApp, error) {
 		auth,
 	)
 
-	packetDevice, err := packets.NewPacketDevice("linux")
+	packetDevice, err := packets.NewPacketDevice("linux", cfg) // TODO конфиг / env
 	if err != nil {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildClientApp
