@@ -1,4 +1,4 @@
-package proxy
+package client
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
@@ -31,8 +32,8 @@ type TunnelEngine struct {
 	clientListeners []ClientListener
 	tunnelMessages  chan core.MessageData
 
-	serverTonnelConn net.Conn      // Туннельное подключение к серверу
-	status           *TunnelStatus // Состояние работы
+	serverTonnelConn net.Conn            // Туннельное подключение к серверу
+	status           *proxy.TunnelStatus // Состояние работы
 }
 
 func (t *TunnelEngine) ConnectToTunnel() error {
@@ -62,10 +63,10 @@ func (t *TunnelEngine) RegistrateListener(listener ClientListener) {
 }
 
 func (t *TunnelEngine) IsRunning() bool {
-	return t.status.isRunning
+	return t.status.IsRunning()
 }
 
-func (t *TunnelEngine) GetStatus() *TunnelStatus {
+func (t *TunnelEngine) GetStatus() *proxy.TunnelStatus {
 	return t.status
 }
 
@@ -95,7 +96,7 @@ func (t *TunnelEngine) waitConnectionToTunnel() (net.Conn, error) {
 }
 
 func (t *TunnelEngine) stopListening(stopRunning bool) error {
-	if !t.status.isRunning {
+	if !t.status.IsRunning() {
 		t.logger.Warning("[stopListening] Trying to stop stopped service, cencel")
 		return nil
 	}
@@ -119,8 +120,8 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 func (t *TunnelEngine) tunnelReader() {
 	t.logger.Info("[tunnelReader] Start tunnel listening")
 
-	for t.status.isRunning {
-		frame, err := ReadFrameFromConnection(t.serverTonnelConn, t.framer)
+	for t.status.IsRunning() {
+		frame, err := proxy.ReadFrameFromConnection(t.serverTonnelConn, t.framer)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				t.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
@@ -147,7 +148,7 @@ func (t *TunnelEngine) tunnelReader() {
 }
 
 func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	if !t.status.isRunning || t.serverTonnelConn == nil {
+	if !t.status.IsRunning() || t.serverTonnelConn == nil {
 		return nil
 	}
 	t.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
@@ -199,7 +200,7 @@ func NewTunnelEngine(
 		transport:        transport,
 		encryptor:        encryptor,
 		framer:           framer,
-		status:           NewTunnelStatus(),
+		status:           proxy.NewTunnelStatus(),
 		serverTonnelConn: nil,
 		remoteAddr:       cfg.RemoteHost,
 		logger:           logger,

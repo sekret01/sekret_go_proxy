@@ -152,7 +152,7 @@ func (s *ServerTunnel) tunnelReader(tunnelConn net.Conn, writeChannel *TunnelCha
 				continue
 			}
 			conWrapper.Conn.Close()
-			closeConnection(s.dispatcher, requestId)
+			CloseConnection(s.dispatcher, requestId)
 		}
 	}
 }
@@ -209,7 +209,7 @@ func (s *ServerTunnel) targetConnectinoHandler(requestId core.RequestID, targetC
 	defer func() {
 		s.sendCloseIntoTunnel(requestId, writeChannel)
 		s.closeChannel(requestId)
-		closeConnection(s.dispatcher, requestId)
+		CloseConnection(s.dispatcher, requestId)
 
 	}()
 

@@ -1,4 +1,4 @@
-package proxy
+package client
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
@@ -27,7 +28,7 @@ type ClientTunnel struct {
 	listener   net.Listener // Слушатель внешних поключений
 }
 
-func (c *ClientTunnel) GetStatus() *TunnelStatus {
+func (c *ClientTunnel) GetStatus() *proxy.TunnelStatus {
 	return c.tunnelEngin.GetStatus()
 }
 
@@ -241,15 +242,15 @@ func (c *ClientTunnel) listenTunnelMessages() {
 					strings.Contains(dataStr, "Connection: close") {
 					c.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(msg.RequestId) + "]")
 					c.tunnelEngin.sendCloseIntoTunnel(msg.RequestId)
-					closeConnection(c.dispatcher, msg.RequestId)
+					proxy.CloseConnection(c.dispatcher, msg.RequestId)
 				}
 
 			}
 		case core.MsgClose:
-			closeConnection(c.dispatcher, msg.RequestId)
+			proxy.CloseConnection(c.dispatcher, msg.RequestId)
 		case core.MsgError:
 			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			closeConnection(c.dispatcher, msg.RequestId)
+			proxy.CloseConnection(c.dispatcher, msg.RequestId)
 		}
 	}
 }

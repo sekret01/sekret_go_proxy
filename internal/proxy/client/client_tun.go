@@ -1,7 +1,8 @@
-package proxy
+package client
 
 import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
@@ -42,7 +43,7 @@ func (c *ClientTun) Stop() error {
 	return c.tunnelEngine.stopListening(true)
 }
 
-func (c *ClientTun) GetStatus() *TunnelStatus {
+func (c *ClientTun) GetStatus() *proxy.TunnelStatus {
 	return c.tunnelEngine.GetStatus()
 }
 

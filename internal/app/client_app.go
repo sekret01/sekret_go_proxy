@@ -9,12 +9,13 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
+	"github.com/sekret01/sekret_go_proxy/internal/proxy/client"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type ClientApp struct {
-	tunnel *proxy.ClientTunnel
+	tunnel *client.ClientTunnel
 }
 
 func (p *ClientApp) Start() error {
@@ -61,7 +62,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		return nil, core.ErrBuildClientApp
 	}
 
-	tunnelEngin := proxy.NewTunnelEngine(
+	tunnelEngin := client.NewTunnelEngine(
 		transport,
 		encryptor,
 		framer,
@@ -71,7 +72,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		auth,
 	)
 
-	tunnel := proxy.NewClientTunnel(
+	tunnel := client.NewClientTunnel(
 		tunnelEngin,
 		detector,
 		dispatcher,
