@@ -1,7 +1,6 @@
 package client
 
 import (
-	"errors"
 	"net"
 	"sync"
 	"time"
@@ -19,21 +18,20 @@ type ClientListener interface {
 
 // Функции взаимодействия с тунелем
 type TunnelEngine struct {
-	transport core.Transport // Подключение и передача информации
-	encryptor core.Encryptor // Шифрование и расшифровка
-	framer    core.Framer    // Оборачивание и парсинг самописных протоколов
-	auth      core.Auth
+	tunnelNode *proxy.TunnelNode
+	transport  core.Transport // Подключение и передача информации
+	encryptor  core.Encryptor // Шифрование и расшифровка
+	framer     core.Framer    // Оборачивание и парсинг самописных протоколов
+	auth       core.Auth
 
 	remoteAddr string // Адрес удаленного узла для подключения
 
 	logger          logger.Logger
 	mutex           sync.Mutex
-	tunnelChan      chan []byte
 	clientListeners []ClientListener
 	tunnelMessages  chan core.MessageData
 
-	serverTonnelConn net.Conn            // Туннельное подключение к серверу
-	status           *proxy.TunnelStatus // Состояние работы
+	status *proxy.TunnelStatus // Состояние работы
 }
 
 func (t *TunnelEngine) ConnectToTunnel() error {
@@ -52,8 +50,7 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 		return err
 	}
 	t.status.SetRunning()
-	t.serverTonnelConn = conn
-	go t.tunnelChanReader()
+	t.tunnelNode = proxy.NewTunnelNode(conn, t.framer)
 	go t.tunnelReader()
 	return nil
 }
@@ -103,15 +100,10 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 	if stopRunning {
 		t.status.SetStopped()
 	}
-	if t.serverTonnelConn != nil {
-		t.serverTonnelConn.Close()
-		t.serverTonnelConn = nil
-	}
+	t.tunnelNode.Stop()
 	t.closeListeners()
-	close(t.tunnelChan)
-	t.tunnelChan = make(chan []byte, 1000)
-	close(t.tunnelMessages)
-	t.tunnelMessages = make(chan core.MessageData, 1000)
+	close(t.tunnelMessages)                              // TODO нужно ли
+	t.tunnelMessages = make(chan core.MessageData, 1000) // TODO нужно ли
 	t.logger.Info("[stopListening] Stop tunnel listening")
 	return nil
 }
@@ -119,18 +111,9 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 // Чтение, обработка и перессылка данных с сервера
 func (t *TunnelEngine) tunnelReader() {
 	t.logger.Info("[tunnelReader] Start tunnel listening")
+	readChannel := t.tunnelNode.GetReadChan().GetChannel()
 
-	for t.status.IsRunning() {
-		frame, err := proxy.ReadFrameFromConnection(t.serverTonnelConn, t.framer)
-		if err != nil {
-			if errors.Is(err, net.ErrClosed) {
-				t.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
-			} else {
-				t.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
-			}
-			t.stopListening(false)
-			return
-		}
+	for frame := range readChannel {
 		data, msgType, requestId, err := t.framer.Unframe(frame)
 		if err != nil {
 			t.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
@@ -144,11 +127,15 @@ func (t *TunnelEngine) tunnelReader() {
 		}
 		t.tunnelMessages <- frameData
 	}
+
 	t.logger.Error("EXIT FROM READ CYCLE")
+	if t.status.IsRunning() {
+		t.stopListening(false)
+	}
 }
 
 func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	if !t.status.IsRunning() || t.serverTonnelConn == nil {
+	if !t.status.IsRunning() {
 		return nil
 	}
 	t.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
@@ -158,29 +145,13 @@ func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		t.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
-	t.mutex.Lock()
-	t.tunnelChan <- frame
-	t.mutex.Unlock()
+	t.tunnelNode.Send(frame)
 	return nil
 }
 
 func (t *TunnelEngine) sendCloseIntoTunnel(requestId core.RequestID) {
 	t.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
 	t.sendIntoTunnel(requestId, core.MsgClose, []byte{})
-}
-
-func (t *TunnelEngine) tunnelChanReader() {
-	for frame := range t.tunnelChan {
-		if t.serverTonnelConn == nil {
-			continue
-		}
-		_, err := t.serverTonnelConn.Write(frame)
-		if err != nil {
-			t.logger.Error("[tunnelChanReader] Error in send data: " + err.Error())
-			continue
-		}
-		t.logger.Debug("[tunnelChanReader] Data has been sent")
-	}
 }
 
 func (t *TunnelEngine) closeListeners() {
@@ -197,17 +168,16 @@ func NewTunnelEngine(
 	logger logger.Logger,
 	auth core.Auth) *TunnelEngine {
 	engine := &TunnelEngine{
-		transport:        transport,
-		encryptor:        encryptor,
-		framer:           framer,
-		status:           proxy.NewTunnelStatus(),
-		serverTonnelConn: nil,
-		remoteAddr:       cfg.RemoteHost,
-		logger:           logger,
-		tunnelChan:       make(chan []byte, 1000),
-		clientListeners:  make([]ClientListener, 0),
-		tunnelMessages:   make(chan core.MessageData, 1000),
-		auth:             auth,
+		tunnelNode:      nil,
+		transport:       transport,
+		encryptor:       encryptor,
+		framer:          framer,
+		status:          proxy.NewTunnelStatus(),
+		remoteAddr:      cfg.RemoteHost,
+		logger:          logger,
+		clientListeners: make([]ClientListener, 0),
+		tunnelMessages:  make(chan core.MessageData, 1000),
+		auth:            auth,
 	}
 	return engine
 }

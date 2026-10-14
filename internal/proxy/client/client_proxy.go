@@ -20,12 +20,11 @@ import (
 // Туннель для единого соединения с сервером
 type ClientProxy struct {
 	tunnelEngin *TunnelEngine
-	// dispatcher core.Dispatcher // Сохранение связи запрос - владелец запроса
-	detector   core.Detector // Определение протокола
-	dispatcher core.Dispatcher
-	localAddr  string // Адрес текущего узла
-	logger     logger.Logger
-	listener   net.Listener // Слушатель внешних поключений
+	detector    core.Detector // Определение протокола
+	dispatcher  core.Dispatcher
+	localAddr   string // Адрес текущего узла
+	logger      logger.Logger
+	listener    net.Listener // Слушатель внешних поключений
 }
 
 func (c *ClientProxy) GetStatus() *proxy.TunnelStatus {
@@ -78,13 +77,13 @@ func (c *ClientProxy) connectionsListener(listener net.Listener) error {
 		requestConn, err := c.listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
-				c.logger.Info("[ClientProxy] Close listener")
+				c.logger.Info("[connectionsListener] Close listener")
 				return nil
 			}
 			if c.tunnelEngin.IsRunning() {
 				continue
 			} else {
-				c.logger.Info("[ClientProxy] Close listener (" + err.Error() + ")")
+				c.logger.Info("[connectionsListener] Close listener (" + err.Error() + ")")
 				return err
 			}
 		}
