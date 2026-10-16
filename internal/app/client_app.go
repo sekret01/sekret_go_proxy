@@ -66,7 +66,6 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		transport,
 		encryptor,
 		framer,
-		// dispatcher,
 		cfg,
 		logger.GetLoggerHub().WithModule("TunnelEngine"),
 		auth,

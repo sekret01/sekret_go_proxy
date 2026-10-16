@@ -50,7 +50,6 @@ func NewClientTunApp(cfg *config.Config) (*ClientTunApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	framer, err := framers.NewFramer(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
-	// dispatcher, err := dispatchers.NewDispatcher(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
 	auth, err := auths.NewEncryptor(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
@@ -64,7 +63,6 @@ func NewClientTunApp(cfg *config.Config) (*ClientTunApp, error) {
 		transport,
 		encryptor,
 		framer,
-		// dispatcher,
 		cfg,
 		logger.GetLoggerHub().WithModule("TunnelEngine"),
 		auth,

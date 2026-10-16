@@ -113,7 +113,6 @@ func (t *TunnelEngine) tunnelReader() {
 	t.logger.Info("[tunnelReader] Start tunnel listening")
 	readChannel := t.tunnelNode.GetReadChan().GetChannel()
 
-	// for frame := range readChannel {
 	for {
 		select {
 		case <-t.tunnelNode.Done():
