@@ -113,25 +113,32 @@ func (t *TunnelEngine) tunnelReader() {
 	t.logger.Info("[tunnelReader] Start tunnel listening")
 	readChannel := t.tunnelNode.GetReadChan().GetChannel()
 
-	for frame := range readChannel {
-		data, msgType, requestId, err := t.framer.Unframe(frame)
-		if err != nil {
-			t.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
-			continue
+	// for frame := range readChannel {
+	for {
+		select {
+		case <-t.tunnelNode.Done():
+			t.logger.Info("[tunnelReader] Exit from read cycle")
+			if t.status.IsRunning() {
+				t.stopListening(false)
+			}
+			return
+		case frame := <-readChannel:
+			data, msgType, requestId, err := t.framer.Unframe(frame)
+			if err != nil {
+				t.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
+				continue
+			}
+			decryptData := t.encryptor.Decrypt(data)
+			frameData := core.MessageData{
+				MsgType:   msgType,
+				RequestId: requestId,
+				Data:      decryptData,
+			}
+			t.tunnelMessages <- frameData
 		}
-		decryptData := t.encryptor.Decrypt(data)
-		frameData := core.MessageData{
-			MsgType:   msgType,
-			RequestId: requestId,
-			Data:      decryptData,
-		}
-		t.tunnelMessages <- frameData
+
 	}
 
-	t.logger.Error("EXIT FROM READ CYCLE")
-	if t.status.IsRunning() {
-		t.stopListening(false)
-	}
 }
 
 func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
