@@ -132,7 +132,7 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 				return nil
 			}
 		}
-		_, err = s.auth.ServerHandshake(con) // TODO вынести в listenConnectoins
+		_, err = s.auth.ServerHandshake(con)
 		if err != nil {
 			s.logger.Warning("[listenConnectoins] Handshake error: " + err.Error())
 			continue
@@ -151,7 +151,7 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 	}
 }
 
-func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNode *proxy.TunnelNode, msgChannel chan core.MessageData) { // writeChannel chan []byte
+func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNode *proxy.TunnelNode, msgChannel chan core.MessageData) {
 	s.logger.Info("[tunnelReader] Start tunnel listening with " + ip)
 	for {
 		select {
@@ -174,7 +174,7 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNode *proxy.TunnelNod
 				Data:      decryptData,
 			}
 			select {
-			case <-tunnelNode.Done(): // TODO ???
+			case <-tunnelNode.Done():
 			default:
 				msgChannel <- frameData
 			}
@@ -182,7 +182,7 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNode *proxy.TunnelNod
 	}
 }
 
-func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, tunNode *proxy.TunnelNode) error { // writeChannel chan []byte \ writeChannel *proxy.TunnelChannel
+func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, tunNode *proxy.TunnelNode) error {
 	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
 	payloadEncode := s.encryptor.Encrypt([]byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
@@ -196,7 +196,7 @@ func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType co
 
 // HELP
 
-func (s *ServerTunnelEngine) sendCloseIntoTunnel(requestId core.RequestID, tunNode *proxy.TunnelNode) { // writeChannel chan []byte
+func (s *ServerTunnelEngine) sendCloseIntoTunnel(requestId core.RequestID, tunNode *proxy.TunnelNode) {
 	s.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
 	s.sendIntoTunnel(requestId, core.MsgClose, []byte{}, tunNode)
 }

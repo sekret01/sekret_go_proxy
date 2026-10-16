@@ -37,7 +37,7 @@ func (c *ClientProxy) Start() error {
 		c.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
-	c.tunnelEngin.SetLaunch() // TODO сделать отедльные функции в TunnelEngine
+	c.tunnelEngin.SetLaunch()
 	for c.tunnelEngin.IsRunning() {
 		err := c.tunnelEngin.ConnectToTunnel()
 		if err != nil {
@@ -190,7 +190,7 @@ func (c *ClientProxy) handleTunnelConnect(requestConn net.Conn, targetHost strin
 	err := c.tunnelEngin.sendIntoTunnel(requestId, core.MsgConnect, []byte(targetHost))
 	if err != nil {
 		requestConn.Close()
-		c.dispatcher.Delete(requestId) // TODO решить что с диспетчером делать
+		c.dispatcher.Delete(requestId)
 		return
 	}
 	c.listenFromClientForTunnel(requestId, requestConn)

@@ -38,7 +38,7 @@ func (d *LinuxPacketDevice) CreateTun(name string) error {
 	if err != nil {
 		return err
 	}
-	var ifreq [unix.IFNAMSIZ + 64]byte // IFNAMSIZ
+	var ifreq [unix.IFNAMSIZ + 64]byte
 	copy(ifreq[:], name)
 	*(*uint16)(unsafe.Pointer(&ifreq[unix.IFNAMSIZ])) = unix.IFF_TUN | unix.IFF_NO_PI
 
