@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -54,15 +55,19 @@ func (t *TunnelNode) GetWriteChan() *SafeChannel {
 }
 
 func (t *TunnelNode) Send(frame []byte) error {
-	t.connMut.Lock()
-	defer t.connMut.Unlock()
-	if !t.isRunning {
+	select {
+	case <-t.done:
 		t.logger.Debug("[Send] Tunnel is close, exit")
 		return nil
+	default:
+		if !t.tunnelWriteChan.Put(frame) {
+			t.logger.Debug("[Send] tunnel is closed, abort sending")
+			return nil
+		}
+		t.logger.Debug("[Send] Put frame in write chan")
+		return nil
 	}
-	t.logger.Debug("[Send] Put frame in write chan")
-	t.tunnelWriteChan.Put(frame)
-	return nil
+
 }
 
 func (t *TunnelNode) tunnelReader() {
@@ -84,7 +89,7 @@ func (t *TunnelNode) tunnelReader() {
 			return
 		}
 		if !t.tunnelReadChan.Put(frame) {
-			t.logger.Debug("[tunnelReader] tunnel is closed, exit reader")
+			t.logger.Debug("[tunnelReader] tunnel is closed or writeChan is full, exit reader")
 			return
 		}
 		t.logger.Debug("[tunnelReader] Put frame in read chan")
@@ -146,6 +151,8 @@ func (s *SafeChannel) Put(data []byte) bool {
 		return false
 	case s.channel <- data:
 		return true
+	case <-time.After(time.Second * 5):
+		return false
 	}
 }
 

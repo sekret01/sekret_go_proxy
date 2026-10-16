@@ -77,7 +77,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		detector,
 		dispatcher,
 		cfg,
-		logger.GetLoggerHub().WithModule("ClientApp"),
+		logger.GetLoggerHub().WithModule("ClientProxy"),
 	)
 	return &ClientApp{
 		tunnel: tunnel,

@@ -3,8 +3,8 @@ package server
 import (
 	"net"
 	"sync"
-	"time"
 
+	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -13,22 +13,37 @@ import (
 
 type chanMap map[core.RequestID]chan []byte
 
-type ServerTunnelEngine struct {
-	transport core.Transport
-	encryptor core.Encryptor
-	framer    core.Framer
-	auth      core.Auth
+type TunnelNodeWrapper struct {
+	node       *proxy.TunnelNode
+	ip         string
+	msgChannel chan core.MessageData
+}
 
-	localAddr       string
-	mainListener    net.Listener
-	connectionsList []net.Conn // TODO объединить в структуру
-	connChannels    chanMap    // TODO объединить в структуру
-	connMutex       sync.Mutex
-	chanMutex       sync.RWMutex
-	tunnelMessages  chan core.MessageData
+func (t *TunnelNodeWrapper) Node() *proxy.TunnelNode        { return t.node }
+func (t *TunnelNodeWrapper) Ip() string                     { return t.ip }
+func (t *TunnelNodeWrapper) MsgChan() chan core.MessageData { return t.msgChannel }
+func NewTunnelNodeWrapper(node *proxy.TunnelNode, ip string, msgChannel chan core.MessageData) *TunnelNodeWrapper {
+	return &TunnelNodeWrapper{
+		node:       node,
+		ip:         ip,
+		msgChannel: msgChannel,
+	}
+}
+
+type ServerTunnelEngine struct {
+	transport      core.Transport
+	encryptor      core.Encryptor
+	framer         core.Framer
+	auth           core.Auth
+	tunnelNodesMap map[string]*TunnelNodeWrapper
+	tunnelsChannel chan *TunnelNodeWrapper
+
+	localAddr    string
+	mainListener net.Listener
+	connMutex    sync.Mutex
+	chanMutex    sync.RWMutex
 
 	logger logger.Logger
-
 	status *proxy.TunnelStatus
 }
 
@@ -37,6 +52,7 @@ func (s *ServerTunnelEngine) RunTunnel() error {
 	listener, err := s.transport.Listen(s.localAddr)
 	s.logger.Info("Start listen on " + s.localAddr)
 	if err != nil {
+		s.status.SetStopped()
 		return err
 	}
 	s.status.SetRunning()
@@ -51,17 +67,37 @@ func (s *ServerTunnelEngine) StopListening() error {
 		return nil
 	}
 	s.status.SetStopped()
-	for id, connChan := range s.connChannels {
-		close(connChan)
-		delete(s.connChannels, id)
+	s.connMutex.Lock()
+	for soket, tunNode := range s.tunnelNodesMap {
+		tunNode.Node().Stop()
+		delete(s.tunnelNodesMap, soket)
 	}
-	for _, conn := range s.connectionsList {
-		conn.Close()
-	}
-	s.connectionsList = nil
-	s.connectionsList = []net.Conn{}
+	s.connMutex.Unlock()
 	s.mainListener.Close()
 	return nil
+}
+
+func (s *ServerTunnelEngine) GetTunnelNodesChannel() chan *TunnelNodeWrapper {
+	return s.tunnelsChannel
+}
+
+func (s *ServerTunnelEngine) GetTunnelNodeWrapperForIp(ip string) *TunnelNodeWrapper {
+	s.connMutex.Lock()
+	defer s.connMutex.Unlock()
+	if node, ex := s.tunnelNodesMap[ip]; ex {
+		return node
+	}
+	return nil
+}
+
+func (s *ServerTunnelEngine) GetConnectedIps() []string {
+	s.connMutex.Lock()
+	res := []string{}
+	for ip, _ := range s.tunnelNodesMap {
+		res = append(res, ip)
+	}
+	s.connMutex.Unlock()
+	return res
 }
 
 func (s *ServerTunnelEngine) IsRunning() bool {
@@ -96,60 +132,57 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 				return nil
 			}
 		}
-		writeChannel := proxy.NewTunnelChannel()
-		s.addConnToList(con)
-		go s.tunnelWriter(con, writeChannel)
-		go s.tunnelReader(con, writeChannel)
-	}
-}
-
-func (s *ServerTunnelEngine) tunnelReader(tunnelConn net.Conn, writeChannel *proxy.TunnelChannel) { // writeChannel chan []byte
-	s.logger.Info("[tunnelReader] Start tunnel listening with " + tunnelConn.RemoteAddr().String())
-
-	_, err := s.auth.ServerHandshake(tunnelConn)
-	if err != nil {
-		s.logger.Error(err.Error())
-		writeChannel.Close()
-		s.removeConnFromList(tunnelConn)
-		return
-	}
-	s.logger.Debug("[tunnelReader] auth success")
-
-	for {
-		frame, err := proxy.ReadFrameFromConnection(tunnelConn, s.framer)
+		_, err = s.auth.ServerHandshake(con) // TODO вынести в listenConnectoins
 		if err != nil {
-			s.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
-			writeChannel.Close()
-			s.removeConnFromList(tunnelConn)
-			return
-		}
-		data, msgType, requestId, err := s.framer.Unframe(frame)
-		if err != nil {
-			s.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
+			s.logger.Warning("[listenConnectoins] Handshake error: " + err.Error())
 			continue
 		}
-		decryptData := s.encryptor.Decrypt(data)
-		frameData := core.MessageData{
-			MsgType:   msgType,
-			RequestId: requestId,
-			Data:      decryptData,
-		}
-		s.tunnelMessages <- frameData // TODO для каждого подключениня (туннеля) свой канал
+		s.logger.Debug("[listenConnectoins] auth success")
+		tunnelNode := proxy.NewTunnelNode(con, s.framer)
+		msgChannel := make(chan core.MessageData, 1000)
+		ip := con.RemoteAddr().String()
+		tunNodeWrapper := NewTunnelNodeWrapper(tunnelNode, ip, msgChannel)
+		s.connMutex.Lock()
+		s.tunnelNodesMap[ip] = tunNodeWrapper
+		s.connMutex.Unlock()
+		s.tunnelsChannel <- tunNodeWrapper
+		s.logger.Debug("[listenConnectoins] New connection: " + ip)
+		go s.tunnelReader(ip, tunnelNode, msgChannel)
 	}
 }
 
-func (s *ServerTunnelEngine) tunnelWriter(tunnelConn net.Conn, writeChannel *proxy.TunnelChannel) { // writeChannel chan []byte
-	for frame := range writeChannel.Channel {
-		_, err := tunnelConn.Write(frame)
-		if err != nil {
-			s.logger.Error("[tunnelWriter]: write msg error in tunnel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ]: " + err.Error())
-			// close(writeChannel)
+func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNode *proxy.TunnelNode, msgChannel chan core.MessageData) { // writeChannel chan []byte
+	s.logger.Info("[tunnelReader] Start tunnel listening with " + ip)
+	for {
+		select {
+		case <-tunnelNode.Done():
+			s.logger.Info("[tunnelReader] Exit from read cycle")
+			s.connMutex.Lock()
+			delete(s.tunnelNodesMap, ip)
+			s.connMutex.Unlock()
 			return
+		case frame := <-tunnelNode.GetReadChan().GetChannel():
+			data, msgType, requestId, err := s.framer.Unframe(frame)
+			if err != nil {
+				s.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
+				continue
+			}
+			decryptData := s.encryptor.Decrypt(data)
+			frameData := core.MessageData{
+				MsgType:   msgType,
+				RequestId: requestId,
+				Data:      decryptData,
+			}
+			select {
+			case <-tunnelNode.Done(): // TODO ???
+			default:
+				msgChannel <- frameData
+			}
 		}
 	}
 }
 
-func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, writeChannel *proxy.TunnelChannel) error { // writeChannel chan []byte
+func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, tunNode *proxy.TunnelNode) error { // writeChannel chan []byte \ writeChannel *proxy.TunnelChannel
 	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
 	payloadEncode := s.encryptor.Encrypt([]byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
@@ -157,44 +190,36 @@ func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType co
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
-	if !writeChannel.IsOpen() {
-		s.logger.Debug("[sendIntoTunnel] Trying send data in close tunnel-channel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ], cencel")
-		return nil
-	}
-	select {
-	case writeChannel.Channel <- frame:
-		s.logger.Debug("[sendIntoTunnel] Data has been put into writeChannel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ]")
-		return nil
-	case <-time.After(time.Second * 5):
-		s.logger.Error("[sendIntoTunnel] writeChannel [ tun_ch_" + utils.IntToString(writeChannel.Id) + " ] is full")
-	}
+	tunNode.Send(frame)
 	return nil
 }
 
 // HELP
 
-func (s *ServerTunnelEngine) sendCloseIntoTunnel(requestId core.RequestID, writeChannel *proxy.TunnelChannel) { // writeChannel chan []byte
+func (s *ServerTunnelEngine) sendCloseIntoTunnel(requestId core.RequestID, tunNode *proxy.TunnelNode) { // writeChannel chan []byte
 	s.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
-	s.sendIntoTunnel(requestId, core.MsgClose, []byte{}, writeChannel)
+	s.sendIntoTunnel(requestId, core.MsgClose, []byte{}, tunNode)
 }
 
-func (s *ServerTunnelEngine) addConnToList(con net.Conn) {
-	s.connectionsList = append(s.connectionsList, con)
-}
-
-func (s *ServerTunnelEngine) removeConnFromList(con net.Conn) {
-	ind := -1
-	for i, el := range s.connectionsList {
-		if el.RemoteAddr().String() == con.RemoteAddr().String() {
-			ind = i
-			break
-		}
+func NewServerTunnelEngine(
+	transport core.Transport,
+	encryptor core.Encryptor,
+	framer core.Framer,
+	auth core.Auth,
+	cfg *config.Config,
+	logger logger.Logger,
+) *ServerTunnelEngine {
+	engine := &ServerTunnelEngine{
+		transport:      transport,
+		encryptor:      encryptor,
+		framer:         framer,
+		auth:           auth,
+		tunnelNodesMap: make(map[string]*TunnelNodeWrapper),
+		tunnelsChannel: make(chan *TunnelNodeWrapper),
+		localAddr:      cfg.LocalHost,
+		mainListener:   nil,
+		logger:         logger,
+		status:         proxy.NewTunnelStatus(),
 	}
-	if ind == -1 {
-		s.logger.Warning("Con not found in list")
-		return
-	}
-	s.connectionsList[ind] = s.connectionsList[len(s.connectionsList)-1]
-	s.connectionsList[len(s.connectionsList)-1] = nil
-	s.connectionsList = s.connectionsList[:len(s.connectionsList)-1]
+	return engine
 }
