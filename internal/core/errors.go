@@ -21,4 +21,6 @@ var (
 	ErrAythFailed = errors.New("Authentication failed")
 
 	ErrAppNotRunning = errors.New("App is not running now")
+
+	ErrTunnelClosed = errors.New("Tunnel is closed")
 )

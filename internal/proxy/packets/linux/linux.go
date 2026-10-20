@@ -52,12 +52,80 @@ func (d *LinuxPacketDevice) CreateTun(name string) error {
 		d.closeVirtualTun(intfName)
 		return err
 	}
-	if err := d.setRoutes(); err != nil { // TODO из конфига / парсить
-		d.unsetRoutes() // TODO из конфига / парсить
-		d.closeVirtualTun(intfName)
+	d.isActive = true
+	return nil
+}
+
+func (d *LinuxPacketDevice) ClientConfigure(ipAddr string) error {
+	if err := utils.ShRun("ip", "addr", "add", ipAddr+"/32", "dev", intfName); err != nil {
 		return err
 	}
-	d.isActive = true
+	gatewayIP, err := getDefaultGateway()
+	if err != nil {
+		return err
+	}
+	if err := utils.ShRun("ip", "route", "add", d.serverIP+"/32", "via", gatewayIP); err != nil {
+		return err
+	}
+	if err := utils.ShRun("ip", "route", "add", "0.0.0.0/1", "dev", "tun0"); err != nil {
+		return err
+	}
+	return utils.ShRun("ip", "route", "add", "128.0.0.0/1", "dev", "tun0")
+}
+
+func (d *LinuxPacketDevice) ClientUnconfigure() error {
+	utils.ShRun("ip", "route", "del", "0.0.0.0/1", "dev", "tun0")
+	utils.ShRun("ip", "route", "del", "128.0.0.0/1", "dev", "tun0")
+	utils.ShRun("ip", "route", "del", d.serverIP+"/32")
+	return nil
+}
+
+func (d *LinuxPacketDevice) ServerConfigure() error {
+	extIface, err := getDefaultInterface()
+	if err != nil {
+		return err
+	}
+	if err := utils.ShRun("sysctl", "-w", "net.ipv4.ip_forward=1"); err != nil {
+		return err
+	}
+	if err := utils.ShRun("iptables", "-A", "FORWARD",
+		"-i", "tun0", "-o", extIface, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	if err := utils.ShRun("iptables", "-A", "FORWARD",
+		"-i", extIface, "-o", "tun0",
+		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	// MASQUERADE
+	if err := utils.ShRun("iptables", "-t", "nat", "-A", "POSTROUTING",
+		"-s", "10.0.0.0/24", "-o", extIface, "-j", "MASQUERADE"); err != nil {
+		return err
+	}
+	if err := utils.ShRun("iptables", "-t", "mangle", "-A", "FORWARD",
+		"-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+		"-j", "TCPMSS", "--clamp-mss-to-pmtu"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *LinuxPacketDevice) ServerUnconfigure() error {
+	extIface, err := getDefaultInterface()
+	if err != nil {
+		return err
+	}
+	utils.ShRun("iptables", "-t", "mangle", "-D", "FORWARD",
+		"-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+		"-j", "TCPMSS", "--clamp-mss-to-pmtu")
+	utils.ShRun("iptables", "-t", "nat", "-D", "POSTROUTING",
+		"-s", "10.0.0.0/24", "-o", extIface, "-j", "MASQUERADE")
+	utils.ShRun("iptables", "-D", "FORWARD",
+		"-i", extIface, "-o", "tun0",
+		"-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT")
+	utils.ShRun("iptables", "-D", "FORWARD",
+		"-i", "tun0", "-o", extIface, "-j", "ACCEPT")
+	utils.ShRun("sysctl", "-w", "net.ipv4.ip_forward=0")
 	return nil
 }
 
@@ -81,8 +149,16 @@ func (d *LinuxPacketDevice) MTU() int {
 	return 1400
 }
 
-func (d *LinuxPacketDevice) Close() error {
-	d.unsetRoutes() // TODO из конфига / парсить
+func (d *LinuxPacketDevice) ClientClose() error {
+	d.ClientUnconfigure()
+	d.closeVirtualTun(intfName)
+	err := d.file.Close()
+	d.isActive = false
+	return err
+}
+
+func (d *LinuxPacketDevice) ServerClose() error {
+	d.ServerUnconfigure()
 	d.closeVirtualTun(intfName)
 	err := d.file.Close()
 	d.isActive = false
@@ -91,9 +167,6 @@ func (d *LinuxPacketDevice) Close() error {
 
 func (d *LinuxPacketDevice) openVirtualTun(name string) error {
 	if err := utils.ShRun("ip", "link", "set", "dev", name, "up", "mtu", "1400"); err != nil {
-		return err
-	}
-	if err := utils.ShRun("ip", "addr", "add", "10.0.0.1/24", "dev", name); err != nil {
 		return err
 	}
 	return nil
@@ -105,25 +178,19 @@ func (d *LinuxPacketDevice) closeVirtualTun(name string) error {
 	return nil
 }
 
-func (d *LinuxPacketDevice) setRoutes() error {
-	gatewayIP, err := getDefaultGateway()
+// Парсит вывод `ip route show default` и достаёт имя интерфейса после "dev".
+func getDefaultInterface() (string, error) {
+	out, err := exec.Command("ip", "route", "show", "default").Output()
 	if err != nil {
-		return err
+		return "", err
 	}
-	if err := utils.ShRun("ip", "route", "add", d.serverIP+"/32", "via", gatewayIP); err != nil {
-		return err
+	fields := strings.Fields(string(out))
+	for i, f := range fields {
+		if f == "dev" && i+1 < len(fields) {
+			return fields[i+1], nil
+		}
 	}
-	if err := utils.ShRun("ip", "route", "add", "0.0.0.0/1", "dev", "tun0"); err != nil {
-		return err
-	}
-	return utils.ShRun("ip", "route", "add", "128.0.0.0/1", "dev", "tun0")
-}
-
-func (d *LinuxPacketDevice) unsetRoutes() error {
-	utils.ShRun("ip", "route", "del", "0.0.0.0/1", "dev", "tun0")
-	utils.ShRun("ip", "route", "del", "128.0.0.0/1", "dev", "tun0")
-	utils.ShRun("ip", "route", "del", d.serverIP+"/32")
-	return nil
+	return "", errors.New("default interface not found")
 }
 
 func NewLinuxPacketDevice(cfg *config.Config) (core.PacketDevice, error) {
