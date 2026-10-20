@@ -33,8 +33,8 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewFramer(cfg *config.Config) (core.HandshakeStep, error) {
-	factory, err := get(cfg.FramerType)
+func NewHandshake(cfg *config.Config, name string) (core.HandshakeStep, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}

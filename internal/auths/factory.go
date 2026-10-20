@@ -35,8 +35,16 @@ func get(key string) (factoryFunc, error) {
 	return encr, nil
 }
 
-func NewEncryptor(config *config.Config) (core.Auth, error) {
+func NewAuth(config *config.Config) (core.Auth, error) {
 	factory, err := get(config.AuthType)
+	if err != nil {
+		return nil, err
+	}
+	return factory(config)
+}
+
+func NewAuthByName(config *config.Config, name string) (core.Auth, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}

@@ -10,12 +10,12 @@ import (
 
 type MockAuth struct{}
 
-func (a *MockAuth) ServerHandshake(conn net.Conn) ([]byte, error) {
-	return make([]byte, 0), nil
+func (a *MockAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
+	return &core.HandshakeContext{}, nil
 }
 
-func (a *MockAuth) ClientHandshake(conn net.Conn) ([]byte, error) {
-	return make([]byte, 0), nil
+func (a *MockAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
+	return &core.HandshakeContext{}, nil
 }
 
 func NewMockAuth(cfg *config.Config) (core.Auth, error) {

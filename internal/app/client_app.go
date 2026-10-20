@@ -53,7 +53,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	dispatcher, err := dispatchers.NewDispatcher(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
-	auth, err := auths.NewEncryptor(cfg)
+	auth, err := auths.NewAuth(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
 

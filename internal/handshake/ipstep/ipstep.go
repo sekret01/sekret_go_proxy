@@ -52,6 +52,10 @@ func (s *IpStep) ServerSide(ctx *core.HandshakeContext, conn net.Conn) error {
 	return err
 }
 
+func (s *IpStep) Name() string {
+	return "ip"
+}
+
 func NewIpStep(cfg *config.Config) (core.HandshakeStep, error) {
 	return &IpStep{
 			ipPool: server.NewIPPool(cfg.VPN.Subnet),
