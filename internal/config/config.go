@@ -6,6 +6,7 @@ type Config struct {
 	LogConfig        `yaml:"logs"`
 	SecureConfig     `yaml:"secure"`
 	AdminConfig      `yaml:"admin"`
+	VPN              `yaml:"vpn"`
 }
 
 type ConnectionConfig struct {
@@ -35,4 +36,8 @@ type AdminConfig struct {
 	User           string `yaml:"user"`
 	Password       string `yaml:"password"`
 	AutoRunProxy   bool   `yaml:"auto_run_proxy"`
+}
+
+type VPN struct {
+	Subnet string `yaml:"subnet"`
 }

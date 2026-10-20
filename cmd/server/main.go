@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/app"
@@ -19,6 +22,8 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	hub := setupLogger()
 	hub.Info("START APP")
@@ -30,15 +35,20 @@ func main() {
 	printRegistrates(hub)
 
 	hub.Info("START BUILD SERVER-APP MODULS")
-	server := buildServerApp(hub, cfg)
+	server := buildServerTunApp(hub, cfg) // buildServerApp(hub, cfg) \ buildServerTunApp
 
-	hub.Info("RUN ADMIN-SERVER")
 	admin := webadmin.NewAdmin(server, cfg, time.Hour)
-	err := admin.Start(cfg.AdminHost)
-	if err != nil {
-		hub.Error(err.Error())
-	}
-	select {}
+	hub.Info("RUN ADMIN-SERVER")
+	go func() {
+		err := admin.Start(cfg.AdminHost)
+		if err != nil {
+			hub.Error(err.Error())
+		}
+	}()
+
+	<-ctx.Done()
+	hub.Info("shutdown signal")
+	admin.Stop(ctx)
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {
@@ -84,7 +94,16 @@ func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
 func buildServerApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerApp {
 	server, err := app.NewServerApp(cfg)
 	if err != nil {
-		hub.Critical("[loadConfig]: " + err.Error())
+		hub.Critical("[buildServerApp]: " + err.Error())
+		criticalExit()
+	}
+	return server
+}
+
+func buildServerTunApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerTunApp {
+	server, err := app.NewServerTunApp(cfg)
+	if err != nil {
+		hub.Critical("[buildServerTunApp]: " + err.Error())
 		criticalExit()
 	}
 	return server

@@ -62,7 +62,7 @@ func (t *TunnelNode) Send(frame []byte) error {
 	default:
 		if !t.tunnelWriteChan.Put(frame) {
 			t.logger.Debug("[Send] tunnel is closed, abort sending")
-			return nil
+			return core.ErrTunnelClosed
 		}
 		t.logger.Debug("[Send] Put frame in write chan")
 		return nil
@@ -82,6 +82,7 @@ func (t *TunnelNode) tunnelReader() {
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				t.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
+				t.Stop() // TODO проверить нужен ли
 			} else {
 				t.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 				t.Stop()

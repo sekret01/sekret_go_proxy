@@ -40,7 +40,7 @@ func (c *ClientTun) Start() error {
 }
 
 func (c *ClientTun) Stop() error {
-	err := c.packetDevice.Close()
+	err := c.packetDevice.ClientClose()
 	if err != nil {
 		c.logger.Error("[Stop]: " + err.Error())
 	}
@@ -52,7 +52,7 @@ func (c *ClientTun) GetStatus() *proxy.TunnelStatus {
 }
 
 func (c *ClientTun) CloseListen() {
-	c.packetDevice.Close()
+	c.packetDevice.ClientClose()
 }
 
 func (c *ClientTun) tunReader() {
