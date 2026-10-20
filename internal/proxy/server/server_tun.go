@@ -226,7 +226,7 @@ func NewServerTun(
 		packetDevice: packetDevice,
 		logger:       logger,
 
-		ipPool:        newIPPool(cfg.VPN.Subnet),
+		ipPool:        NewIPPool(cfg.VPN.Subnet),
 		ipToSession:   make(map[string]*vpnSession),
 		nodeToSession: make(map[*proxy.TunnelNode]*vpnSession),
 		done:          make(chan struct{}),

@@ -12,7 +12,7 @@ type IpPool struct {
 	used map[string]bool
 }
 
-func newIPPool(subnet string) *IpPool {
+func NewIPPool(subnet string) *IpPool {
 	_, ipnet, err := net.ParseCIDR(subnet)
 	if err != nil {
 		panic("bad vpn subnet: " + err.Error())
