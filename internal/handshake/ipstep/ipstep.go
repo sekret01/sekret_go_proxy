@@ -2,7 +2,6 @@ package ipstep
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"strings"
 
@@ -14,19 +13,15 @@ import (
 type IpStep struct{}
 
 func (s *IpStep) ClientSide(ctx *core.HandshakeContext, conn net.Conn) error {
-	fmt.Println("write vpn-ip")
 	if _, err := conn.Write([]byte("vpn-ip")); err != nil {
 		return err
 	}
-	fmt.Println("read getted ip")
 	buf := make([]byte, 25)
 	n, err := conn.Read(buf)
 	if err != nil {
 		return err
 	}
 	res := string(buf[:n])
-	fmt.Printf("read %d bytes\n", n)
-	fmt.Println("res ip: " + res)
 	tokens := strings.Split(res, ":")
 	if len(tokens) < 2 || tokens[0] != "vpn-ip-r" {
 		return errors.New("Unexpected vpn-ip recieve: " + res)

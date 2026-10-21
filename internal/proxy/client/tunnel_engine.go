@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -46,7 +45,6 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 	}
 	t.logger.Info("Try authenticate")
 	t.ctx, err = t.auth.ClientHandshake(conn)
-	fmt.Println(t.ctx)
 	if err != nil {
 		t.status.SetStopped()
 		t.logger.Error(err.Error())
@@ -107,7 +105,7 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 	if stopRunning {
 		t.status.SetStopped()
 	}
-	t.sendCloseIntoTunnel(core.GetNoopID())
+	t.sendCloseIntoTunnel(core.GetNoopID()) // TODO генерировать 1 раз вначале, хранить в структуре
 	t.tunnelNode.Stop()
 	t.closeListeners()
 	close(t.tunnelMessages)                              // TODO нужно ли

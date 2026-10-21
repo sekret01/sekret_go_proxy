@@ -20,9 +20,7 @@ type CompositeHandshakeAuth struct {
 func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
-		fmt.Println("SHSH: start process step " + step.Name())
 		if err := step.ServerSide(ctx, conn); err != nil {
-			fmt.Println("error in step " + step.Name())
 			return ctx, err
 		}
 	}
@@ -32,9 +30,7 @@ func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.Handshake
 func (a *CompositeHandshakeAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
-		fmt.Println("CHSH: start process step " + step.Name())
 		if err := step.ClientSide(ctx, conn); err != nil {
-			fmt.Println("CHSH error in step " + step.Name())
 			return ctx, err
 		}
 	}
