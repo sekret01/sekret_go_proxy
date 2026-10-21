@@ -32,6 +32,7 @@ type TunnelEngine struct {
 	tunnelMessages  chan core.MessageData
 
 	status *proxy.TunnelStatus // Состояние работы
+	ctx    *core.HandshakeContext
 }
 
 func (t *TunnelEngine) ConnectToTunnel() error {
@@ -43,7 +44,7 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 		return err
 	}
 	t.logger.Info("Try authenticate")
-	_, err = t.auth.ClientHandshake(conn)
+	t.ctx, err = t.auth.ClientHandshake(conn)
 	if err != nil {
 		t.status.SetStopped()
 		t.logger.Error(err.Error())
@@ -53,6 +54,10 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 	t.tunnelNode = proxy.NewTunnelNode(conn, t.framer)
 	go t.tunnelReader()
 	return nil
+}
+
+func (t *TunnelEngine) GetHandshakeContext() *core.HandshakeContext {
+	return t.ctx
 }
 
 func (t *TunnelEngine) RegistrateListener(listener ClientListener) {

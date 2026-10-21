@@ -33,6 +33,11 @@ func (c *ClientTun) Start() error {
 			c.Stop()
 			return err
 		}
+		ctx := c.tunnelEngine.GetHandshakeContext()
+		if err := c.SetUpClient(ctx); err != nil {
+			c.Stop()
+			return err
+		}
 		c.tunReader()
 
 	}
@@ -49,6 +54,13 @@ func (c *ClientTun) Stop() error {
 
 func (c *ClientTun) GetStatus() *proxy.TunnelStatus {
 	return c.tunnelEngine.GetStatus()
+}
+
+func (c *ClientTun) SetUpClient(ctx *core.HandshakeContext) error {
+	if err := c.packetDevice.ClientConfigure(ctx.ClientIP); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *ClientTun) CloseListen() {

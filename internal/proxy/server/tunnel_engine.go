@@ -17,12 +17,14 @@ type TunnelNodeWrapper struct {
 	node       *proxy.TunnelNode
 	ip         string
 	msgChannel chan core.MessageData
+	ctx        *core.HandshakeContext
 }
 
-func (t *TunnelNodeWrapper) Node() *proxy.TunnelNode        { return t.node }
-func (t *TunnelNodeWrapper) Ip() string                     { return t.ip }
-func (t *TunnelNodeWrapper) MsgChan() chan core.MessageData { return t.msgChannel }
-func NewTunnelNodeWrapper(node *proxy.TunnelNode, ip string, msgChannel chan core.MessageData) *TunnelNodeWrapper {
+func (t *TunnelNodeWrapper) Node() *proxy.TunnelNode              { return t.node }
+func (t *TunnelNodeWrapper) Ip() string                           { return t.ip }
+func (t *TunnelNodeWrapper) MsgChan() chan core.MessageData       { return t.msgChannel }
+func (t *TunnelNodeWrapper) HandshakeCtx() *core.HandshakeContext { return t.ctx }
+func NewTunnelNodeWrapper(node *proxy.TunnelNode, ip string, msgChannel chan core.MessageData, ctx *core.HandshakeContext) *TunnelNodeWrapper {
 	return &TunnelNodeWrapper{
 		node:       node,
 		ip:         ip,
@@ -132,7 +134,7 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 				return nil
 			}
 		}
-		_, err = s.auth.ServerHandshake(con)
+		ctx, err := s.auth.ServerHandshake(con)
 		if err != nil {
 			s.logger.Warning("[listenConnectoins] Handshake error: " + err.Error())
 			continue
@@ -141,7 +143,7 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 		tunnelNode := proxy.NewTunnelNode(con, s.framer)
 		msgChannel := make(chan core.MessageData, 1000)
 		ip := con.RemoteAddr().String()
-		tunNodeWrapper := NewTunnelNodeWrapper(tunnelNode, ip, msgChannel)
+		tunNodeWrapper := NewTunnelNodeWrapper(tunnelNode, ip, msgChannel, ctx)
 		s.connMutex.Lock()
 		s.tunnelNodesMap[ip] = tunNodeWrapper
 		s.connMutex.Unlock()

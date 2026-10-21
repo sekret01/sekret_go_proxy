@@ -117,29 +117,29 @@ func (s *ServerTun) TunnelNodeHandler(tunWrapper *TunnelNodeWrapper) {
 }
 
 func (s *ServerTun) HandleVpnConnect(tunWrapper *TunnelNodeWrapper, msg core.MessageData) {
-	if string(msg.Data) != "vpn" {
-		s.logger.Warning("[HandleVpnConnect] Unexpected connect payload: " + string(msg.Data))
-		return
-	}
-	clientIp, err := s.ipPool.Allocate()
-	if err != nil {
-		s.logger.Error("[HandleVpnConnect] No free IP: " + err.Error())
-		s.tunnelEngine.sendCloseIntoTunnel(msg.RequestId, tunWrapper.Node())
-		return
-	}
+	// if string(msg.Data) != "vpn" {
+	// 	s.logger.Warning("[HandleVpnConnect] Unexpected connect payload: " + string(msg.Data))
+	// 	return
+	// }
+	// clientIp, err := s.ipPool.Allocate()
+	// if err != nil {
+	// 	s.logger.Error("[HandleVpnConnect] No free IP: " + err.Error())
+	// 	s.tunnelEngine.sendCloseIntoTunnel(msg.RequestId, tunWrapper.Node())
+	// 	return
+	// }
 
 	session := &vpnSession{
 		node:      tunWrapper.Node(),
-		clientIP:  clientIp,
+		clientIP:  tunWrapper.HandshakeCtx().ClientIP,
 		sessionID: msg.RequestId,
 	}
 
 	s.mu.Lock()
-	s.ipToSession[clientIp] = session
+	s.ipToSession[session.clientIP] = session
 	s.nodeToSession[tunWrapper.Node()] = session
 	s.mu.Unlock()
 
-	reply := []byte("vpn:" + clientIp)
+	reply := []byte("vpn:" + session.clientIP)
 	s.tunnelEngine.sendIntoTunnel(msg.RequestId, core.MsgConnect, reply, tunWrapper.Node())
 	s.logger.Debug("[HandleVpnConnect] Create session [ " + utils.RequestIdToString(session.sessionID) +
 		" ] for client [ " + session.clientIP + " ] (" + tunWrapper.Ip())
