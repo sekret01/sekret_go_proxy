@@ -39,7 +39,7 @@ func (d *LinuxPacketDevice) CreateTun(name string) error {
 		return err
 	}
 	var ifreq [unix.IFNAMSIZ + 64]byte
-	copy(ifreq[:], name)
+	copy(ifreq[:], intfName)
 	*(*uint16)(unsafe.Pointer(&ifreq[unix.IFNAMSIZ])) = unix.IFF_TUN | unix.IFF_NO_PI
 
 	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), tunSetIff, uintptr(unsafe.Pointer(&ifreq[0])))
@@ -47,7 +47,7 @@ func (d *LinuxPacketDevice) CreateTun(name string) error {
 		unix.Close(fd)
 		return nil
 	}
-	d.file = os.NewFile(uintptr(fd), name)
+	d.file = os.NewFile(uintptr(fd), intfName)
 	if err := d.openVirtualTun(intfName); err != nil {
 		d.closeVirtualTun(intfName)
 		return err
