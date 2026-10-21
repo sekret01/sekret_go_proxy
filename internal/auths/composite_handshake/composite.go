@@ -1,4 +1,4 @@
-package compositehandshake
+package composite_handshake
 
 import (
 	"net"
@@ -10,13 +10,13 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type CompositeHandshake struct {
+type CompositeHandshakeAuth struct {
 	steps        []core.HandshakeStep
 	logger       logger.Logger
 	ctxGenerator core.HandshakeContextGenerator
 }
 
-func (a *CompositeHandshake) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
+func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
 		if err := step.ServerSide(ctx, conn); err != nil {
@@ -26,7 +26,7 @@ func (a *CompositeHandshake) ServerHandshake(conn net.Conn) (*core.HandshakeCont
 	return ctx, nil
 }
 
-func (a *CompositeHandshake) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
+func (a *CompositeHandshakeAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
 		if err := step.ClientSide(ctx, conn); err != nil {
@@ -45,7 +45,7 @@ func NewConpositeHandshakeAuth(cfg *config.Config, ctxGenerator core.HandshakeCo
 		}
 		steps = append(steps, step)
 	}
-	return &CompositeHandshake{
+	return &CompositeHandshakeAuth{
 		steps:        steps,
 		logger:       logger.GetLoggerHub().WithModule("CompositeHandshakeAuth"),
 		ctxGenerator: ctxGenerator,
