@@ -29,6 +29,7 @@ func NewTunnelNodeWrapper(node *proxy.TunnelNode, ip string, msgChannel chan cor
 		node:       node,
 		ip:         ip,
 		msgChannel: msgChannel,
+		ctx: ctx,
 	}
 }
 

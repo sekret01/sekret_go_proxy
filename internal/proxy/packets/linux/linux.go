@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"unsafe"
+	"fmt"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -31,11 +32,13 @@ type LinuxPacketDevice struct {
 func (d *LinuxPacketDevice) CreateTun(name string) error {
 	serverIP, err := getIpFromHost(d.cfg.RemoteHost)
 	if err != nil {
+		fmt.Println("getiperror")
 		return err
 	}
 	d.serverIP = serverIP
 	fd, err := unix.Open(devPath, unix.O_RDWR|unix.O_CLOEXEC, 0)
 	if err != nil {
+		fmt.Println("opn dev path error")
 		return err
 	}
 	var ifreq [unix.IFNAMSIZ + 64]byte
@@ -44,15 +47,18 @@ func (d *LinuxPacketDevice) CreateTun(name string) error {
 
 	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), tunSetIff, uintptr(unsafe.Pointer(&ifreq[0])))
 	if errno != 0 {
+		fmt.Println("syscall error")
 		unix.Close(fd)
-		return nil
+		return errors.New("Error in syscall")
 	}
 	d.file = os.NewFile(uintptr(fd), name)
 	if err := d.openVirtualTun(intfName); err != nil {
+		fmt.Println("open vurt tun error")
 		d.closeVirtualTun(intfName)
 		return err
 	}
 	d.isActive = true
+	fmt.Println("create tun success")
 	return nil
 }
 
@@ -84,6 +90,9 @@ func (d *LinuxPacketDevice) ServerConfigure() error {
 	extIface, err := getDefaultInterface()
 	if err != nil {
 		return err
+	}
+	if err := utils.ShRun("ip", "addr", "add", "10.0.0.1/24", "dev", intfName); err != nil {
+		                return err
 	}
 	if err := utils.ShRun("sysctl", "-w", "net.ipv4.ip_forward=1"); err != nil {
 		return err

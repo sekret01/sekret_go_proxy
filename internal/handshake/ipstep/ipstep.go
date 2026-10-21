@@ -39,7 +39,7 @@ func (s *IpStep) ServerSide(ctx *core.HandshakeContext, conn net.Conn) error {
 	if string(buf[:n]) != "vpn-ip" {
 		return errors.New("Unexpected vpn-ip hello: " + string(buf[:n]))
 	}
-	_, err = conn.Write([]byte("vpn-ip-r" + ctx.ClientIP))
+	_, err = conn.Write([]byte("vpn-ip-r:" + ctx.ClientIP))
 	return err
 }
 
