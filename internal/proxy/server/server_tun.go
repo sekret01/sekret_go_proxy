@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"sync"
 
@@ -104,6 +105,8 @@ func (s *ServerTun) TunnelNodeHandler(tunWrapper *TunnelNodeWrapper) {
 			s.logger.Debug("[TunnelNodeHandler] Stop server work, exit handle " + tunWrapper.Ip())
 			return
 		case msg := <-tunWrapper.msgChannel:
+			// s.logger.Info("[DELETE] get nsg before switch type: " + utils.BytesToString(msg.Data, 100))
+			fmt.Println(msg)
 			switch msg.MsgType {
 			case core.MsgConnect:
 				s.HandleVpnConnect(tunWrapper, msg)
@@ -127,20 +130,23 @@ func (s *ServerTun) HandleVpnConnect(tunWrapper *TunnelNodeWrapper, msg core.Mes
 	// 	s.tunnelEngine.sendCloseIntoTunnel(msg.RequestId, tunWrapper.Node())
 	// 	return
 	// }
-
+	s.logger.Info("[DELETE] start create session")
+	fmt.Println(tunWrapper)
+	fmt.Println(msg)
 	session := &vpnSession{
 		node:      tunWrapper.Node(),
 		clientIP:  tunWrapper.HandshakeCtx().ClientIP,
 		sessionID: msg.RequestId,
 	}
+	s.logger.Info("[DELETE] session created, start save session in maps")
 
 	s.mu.Lock()
 	s.ipToSession[session.clientIP] = session
 	s.nodeToSession[tunWrapper.Node()] = session
 	s.mu.Unlock()
 
-	reply := []byte("vpn:" + session.clientIP)
-	s.tunnelEngine.sendIntoTunnel(msg.RequestId, core.MsgConnect, reply, tunWrapper.Node())
+	// reply := []byte("vpn:" + session.clientIP)
+	// s.tunnelEngine.sendIntoTunnel(msg.RequestId, core.MsgConnect, reply, tunWrapper.Node())
 	s.logger.Debug("[HandleVpnConnect] Create session [ " + utils.RequestIdToString(session.sessionID) +
 		" ] for client [ " + session.clientIP + " ] (" + tunWrapper.Ip())
 }
