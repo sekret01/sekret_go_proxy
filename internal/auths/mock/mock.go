@@ -18,7 +18,7 @@ func (a *MockAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error
 	return &core.HandshakeContext{}, nil
 }
 
-func NewMockAuth(cfg *config.Config) (core.Auth, error) {
+func NewMockAuth(cfg *config.Config, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error) {
 	return &MockAuth{}, nil
 }
 

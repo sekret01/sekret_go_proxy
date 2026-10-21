@@ -60,6 +60,17 @@ func (s *ServerTun) Start() error {
 	return nil
 }
 
+func (s *ServerTun) NewHandshakeContext() *core.HandshakeContext {
+	ctx := &core.HandshakeContext{}
+	clientIp, err := s.ipPool.Allocate()
+	if err != nil {
+		return nil
+	}
+
+	ctx.ClientIP = clientIp
+	return ctx
+}
+
 func (s *ServerTun) GetStatus() *proxy.TunnelStatus {
 	return s.tunnelEngine.GetStatus()
 }

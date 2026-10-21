@@ -71,6 +71,10 @@ func (c *ClientProxy) CloseListen() {
 	}
 }
 
+func (s *ClientProxy) NewHandshakeContext() *core.HandshakeContext {
+	return &core.HandshakeContext{}
+}
+
 func (c *ClientProxy) connectionsListener(listener net.Listener) error {
 	c.listener = listener
 	for c.tunnelEngin.IsRunning() {

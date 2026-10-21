@@ -51,7 +51,8 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 	framer, err := framers.NewFramer(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
 	buildSuccess = buildSuccess && isContinue(err)
-	auth, err := auths.NewAuth(cfg)
+	ctxGenConnector := &core.HandshakeGeneratorConnector{}
+	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 
 	if !buildSuccess {
@@ -80,6 +81,7 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 		logger.GetLoggerHub().WithModule("ServerTun"),
 		cfg,
 	)
+	ctxGenConnector.SubscribeGenerator(tunnel)
 	return &ServerTunApp{
 		tunnel: tunnel,
 	}, nil

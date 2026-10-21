@@ -51,7 +51,8 @@ func NewClientTunApp(cfg *config.Config) (*ClientTunApp, error) {
 	framer, err := framers.NewFramer(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
 	buildSuccess = buildSuccess && isContinue(err)
-	auth, err := auths.NewAuth(cfg)
+	ctxGenConnector := &core.HandshakeGeneratorConnector{}
+	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 
 	if !buildSuccess {
@@ -79,6 +80,7 @@ func NewClientTunApp(cfg *config.Config) (*ClientTunApp, error) {
 		packetDevice,
 		logger.GetLoggerHub().WithModule("ClientApp"),
 	)
+	ctxGenConnector.SubscribeGenerator(tunnel)
 	return &ClientTunApp{
 		tunnel: tunnel,
 	}, nil

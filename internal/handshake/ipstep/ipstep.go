@@ -8,12 +8,9 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/handshake"
-	"github.com/sekret01/sekret_go_proxy/internal/proxy/server"
 )
 
-type IpStep struct {
-	ipPool *server.IpPool // TODO вынести IpPool в другой пакет
-}
+type IpStep struct{}
 
 func (s *IpStep) ClientSide(ctx *core.HandshakeContext, conn net.Conn) error {
 	if _, err := conn.Write([]byte("vpn-ip")); err != nil {
@@ -42,13 +39,7 @@ func (s *IpStep) ServerSide(ctx *core.HandshakeContext, conn net.Conn) error {
 	if string(buf[:n]) != "vpn-ip" {
 		return errors.New("Unexpected vpn-ip hello: " + string(buf[:n]))
 	}
-	clientIp, err := s.ipPool.Allocate()
-	if err != nil {
-		return err
-	}
-
-	ctx.ClientIP = clientIp
-	_, err = conn.Write([]byte("vpn-ip-r" + clientIp))
+	_, err = conn.Write([]byte("vpn-ip-r" + ctx.ClientIP))
 	return err
 }
 
@@ -57,9 +48,7 @@ func (s *IpStep) Name() string {
 }
 
 func NewIpStep(cfg *config.Config) (core.HandshakeStep, error) {
-	return &IpStep{
-			ipPool: server.NewIPPool(cfg.VPN.Subnet),
-		},
+	return &IpStep{},
 		nil
 }
 

@@ -55,6 +55,10 @@ func (c *ClientTun) CloseListen() {
 	c.packetDevice.ClientClose()
 }
 
+func (s *ClientTun) NewHandshakeContext() *core.HandshakeContext {
+	return &core.HandshakeContext{}
+}
+
 func (c *ClientTun) tunReader() {
 	buf := make([]byte, c.packetDevice.MTU())
 	for c.tunnelEngine.IsRunning() {

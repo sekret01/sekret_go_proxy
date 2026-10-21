@@ -53,7 +53,8 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	dispatcher, err := dispatchers.NewDispatcher(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
-	auth, err := auths.NewAuth(cfg)
+	ctxGenConnector := &core.HandshakeGeneratorConnector{}
+	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
 
@@ -77,6 +78,7 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 		detector,
 		logger.GetLoggerHub().WithModule("ServerProxy"),
 	)
+	ctxGenConnector.SubscribeGenerator(proxy)
 	return &ServerApp{
 		tunnel: proxy,
 	}, nil

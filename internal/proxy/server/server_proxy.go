@@ -49,6 +49,17 @@ func (s *ServerProxy) GetUsers() []string {
 	return s.tunnelEngine.GetConnectedIps()
 }
 
+func (s *ServerProxy) NewHandshakeContext() *core.HandshakeContext {
+	ctx := &core.HandshakeContext{}
+	// clientIp, err := s.ipPool.Allocate()
+	// if err != nil {
+	// 	return nil
+	// }
+
+	// ctx.ClientIP = clientIp
+	return ctx
+}
+
 func (s *ServerProxy) NewTunnelsHandler() {
 	tunnelsChannel := s.tunnelEngine.GetTunnelNodesChannel()
 	for tunWrapper := range tunnelsChannel {

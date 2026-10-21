@@ -11,12 +11,13 @@ import (
 )
 
 type CompositeHandshake struct {
-	steps  []core.HandshakeStep
-	logger logger.Logger
+	steps        []core.HandshakeStep
+	logger       logger.Logger
+	ctxGenerator core.HandshakeContextGenerator
 }
 
 func (a *CompositeHandshake) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
-	ctx := &core.HandshakeContext{}
+	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
 		if err := step.ServerSide(ctx, conn); err != nil {
 			return ctx, err
@@ -26,7 +27,7 @@ func (a *CompositeHandshake) ServerHandshake(conn net.Conn) (*core.HandshakeCont
 }
 
 func (a *CompositeHandshake) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
-	ctx := &core.HandshakeContext{}
+	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
 		if err := step.ClientSide(ctx, conn); err != nil {
 			return ctx, err
@@ -35,7 +36,7 @@ func (a *CompositeHandshake) ClientHandshake(conn net.Conn) (*core.HandshakeCont
 	return ctx, nil
 }
 
-func NewConpositeHandshakeAuth(cfg *config.Config) (core.Auth, error) {
+func NewConpositeHandshakeAuth(cfg *config.Config, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error) {
 	steps := make([]core.HandshakeStep, 0)
 	for _, name := range cfg.HandshakeSteps {
 		step, err := handshake.NewHandshake(cfg, name)
@@ -45,8 +46,9 @@ func NewConpositeHandshakeAuth(cfg *config.Config) (core.Auth, error) {
 		steps = append(steps, step)
 	}
 	return &CompositeHandshake{
-		steps:  steps,
-		logger: logger.GetLoggerHub().WithModule("CompositeHandshakeAuth"),
+		steps:        steps,
+		logger:       logger.GetLoggerHub().WithModule("CompositeHandshakeAuth"),
+		ctxGenerator: ctxGenerator,
 	}, nil
 }
 
