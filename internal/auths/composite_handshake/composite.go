@@ -1,6 +1,7 @@
 package composite_handshake
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
@@ -19,7 +20,9 @@ type CompositeHandshakeAuth struct {
 func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
+		fmt.Println("SHSH: start process step " + step.Name())
 		if err := step.ServerSide(ctx, conn); err != nil {
+			fmt.Println("error in step " + step.Name())
 			return ctx, err
 		}
 	}
@@ -29,7 +32,9 @@ func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.Handshake
 func (a *CompositeHandshakeAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
 	for _, step := range a.steps {
+		fmt.Println("CHSH: start process step " + step.Name())
 		if err := step.ClientSide(ctx, conn); err != nil {
+			fmt.Println("CHSH error in step " + step.Name())
 			return ctx, err
 		}
 	}
@@ -40,9 +45,11 @@ func NewConpositeHandshakeAuth(cfg *config.Config, ctxGenerator core.HandshakeCo
 	steps := make([]core.HandshakeStep, 0)
 	for _, name := range cfg.HandshakeSteps {
 		step, err := handshake.NewHandshake(cfg, name)
+		fmt.Println("process step: " + name)
 		if err != nil {
 			continue
 		}
+		fmt.Println("add step: " + name)
 		steps = append(steps, step)
 	}
 	return &CompositeHandshakeAuth{

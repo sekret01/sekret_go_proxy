@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -45,6 +46,7 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 	}
 	t.logger.Info("Try authenticate")
 	t.ctx, err = t.auth.ClientHandshake(conn)
+	fmt.Println(t.ctx)
 	if err != nil {
 		t.status.SetStopped()
 		t.logger.Error(err.Error())
@@ -105,6 +107,7 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 	if stopRunning {
 		t.status.SetStopped()
 	}
+	t.sendCloseIntoTunnel(core.GetNoopID())
 	t.tunnelNode.Stop()
 	t.closeListeners()
 	close(t.tunnelMessages)                              // TODO нужно ли
@@ -149,7 +152,7 @@ func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 	if !t.status.IsRunning() {
 		return nil
 	}
-	t.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
+	t.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 100) + "]")
 	payloadEncode := t.encryptor.Encrypt([]byte(payload))
 	frame, err := t.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {

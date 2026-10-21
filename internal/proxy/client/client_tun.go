@@ -1,6 +1,8 @@
 package client
 
 import (
+	"fmt"
+
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -34,10 +36,13 @@ func (c *ClientTun) Start() error {
 			return err
 		}
 		ctx := c.tunnelEngine.GetHandshakeContext()
+		fmt.Println("get new connection, handshake success")
+		fmt.Println(ctx)
 		if err := c.SetUpClient(ctx); err != nil {
 			c.Stop()
 			return err
 		}
+		c.tunnelEngine.sendIntoTunnel(core.GetNoopID(), core.MsgConnect, []byte(""))
 		c.tunReader()
 
 	}
@@ -45,6 +50,7 @@ func (c *ClientTun) Start() error {
 }
 
 func (c *ClientTun) Stop() error {
+	c.tunnelEngine.sendCloseIntoTunnel(core.GetNoopID())
 	err := c.packetDevice.ClientClose()
 	if err != nil {
 		c.logger.Error("[Stop]: " + err.Error())

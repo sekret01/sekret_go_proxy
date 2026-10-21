@@ -1,6 +1,7 @@
 package handshake
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
@@ -21,6 +22,7 @@ func Registrate(key string, factory FactoryFunc) {
 		panic("Framer [" + key + "] already exists")
 	}
 	framesMap[key] = factory
+	fmt.Printf("HandshakeStep [%s] has been registrated\n", key)
 }
 
 func get(key string) (FactoryFunc, error) {

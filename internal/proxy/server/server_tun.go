@@ -37,13 +37,13 @@ func (s *ServerTun) Start() error {
 		return nil
 	}
 	s.tunnelEngine.SetLaunch()
+	s.packetDevice.ServerClose()
 	if err := s.packetDevice.CreateTun("tun0"); err != nil {
 		s.logger.Error("[Start] create tun error: " + err.Error())
 		s.packetDevice.ServerClose()
 		// s.tunnelEngine.SetStopped()
 		return err
 	}
-	s.packetDevice.ServerClose()
 	if err := s.packetDevice.ServerConfigure(); err != nil {
 		s.logger.Error("[Start] server configure error: " + err.Error())
 		s.packetDevice.ServerClose()
