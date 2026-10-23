@@ -94,7 +94,7 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 	}
 }
 
-func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeChannel { // chan []byte
+func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeChannel {
 	s.chanMutex.Lock()
 	defer s.chanMutex.Unlock()
 	if ch, ex := s.connChannels[requestId]; ex {
@@ -135,7 +135,7 @@ func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, decryptDat
 	}
 }
 
-func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.SafeChannel, targetCon net.Conn) { // channel chan []byte
+func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.SafeChannel, targetCon net.Conn) {
 	s.logger.Debug("[conChannelReader] start read chan for [" + utils.RequestIdToString(requestId) + " ]")
 	for {
 		select {
@@ -161,7 +161,7 @@ func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCo
 	buf := make([]byte, 32*1024)
 	for {
 		select {
-		case <-tunNode.GetWriteChan().Done(): // TODO tunNode.Done() ?
+		case <-tunNode.GetWriteChan().Done():
 			s.logger.Debug("[targetConnectinoHandler] Tunnel is closed, exit targetConnectinoHandler")
 			return
 		default:
@@ -186,7 +186,6 @@ func (s *ServerProxy) closeChannel(requestId core.RequestID) {
 	defer s.chanMutex.Unlock()
 	if ch, ex := s.connChannels[requestId]; ex {
 		ch.Close()
-		// close(ch)
 		delete(s.connChannels, requestId)
 	}
 	s.logger.Debug("[closeChannel] close target-channel for [" + utils.RequestIdToString(requestId) + " ]")

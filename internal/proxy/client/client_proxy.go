@@ -8,8 +8,6 @@ import (
 	"net"
 	"strings"
 
-	// "sync"
-
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
