@@ -17,11 +17,11 @@ func (a *MockAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error
 func (a *MockAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	return &core.HandshakeContext{}, nil
 }
+func (a *MockAuth) SetEncryptor(enc core.Encryptor) {}
 
 func NewMockAuth(
 	cfg *config.Config,
 	ctxGenerator core.HandshakeContextGenerator,
-	sessionKey []byte,
 ) (core.Auth, error) {
 	return &MockAuth{}, nil
 }
