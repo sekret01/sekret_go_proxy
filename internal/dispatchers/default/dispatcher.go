@@ -1,4 +1,4 @@
-package basedispatcher
+package defaultdispatcher
 
 import (
 	"net"
@@ -11,14 +11,14 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type BaseDispatcher struct {
+type DefaultDispatcher struct {
 	connections map[core.RequestID]core.ConnWrapper
 	mu          sync.RWMutex
 	logger      logger.Logger
 }
 
 // Регистрация подключения в дистпетчер
-func (d *BaseDispatcher) Register(id core.RequestID, requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) {
+func (d *DefaultDispatcher) Register(id core.RequestID, requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.logger.Debug("Registrate [ " + requestConn.LocalAddr().String() + " ] > [ " + utils.RequestIdToString(id) + " ]")
@@ -31,7 +31,7 @@ func (d *BaseDispatcher) Register(id core.RequestID, requestConn net.Conn, proto
 }
 
 // Поиск подключения по ID
-func (d *BaseDispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
+func (d *DefaultDispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	d.logger.Debug("Try to find [ " + utils.RequestIdToString(id) + " ]")
@@ -40,7 +40,7 @@ func (d *BaseDispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 }
 
 // Удаление подключения
-func (d *BaseDispatcher) Delete(id core.RequestID) {
+func (d *DefaultDispatcher) Delete(id core.RequestID) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.logger.Debug("Delete: [ " + utils.RequestIdToString(id) + " ]")
@@ -48,13 +48,13 @@ func (d *BaseDispatcher) Delete(id core.RequestID) {
 }
 
 // Создает единственный диспетчер
-func NewDispatcher(cfg *config.Config) (core.Dispatcher, error) {
-	return &BaseDispatcher{
+func NewDefaultDispatcher(cfg *config.Config) (core.Dispatcher, error) {
+	return &DefaultDispatcher{
 		connections: map[core.RequestID]core.ConnWrapper{},
 		logger:      logger.GetLoggerHub().WithModule("Dispatcher"),
 	}, nil
 }
 
 func init() {
-	dispatchers.Register("base", NewDispatcher)
+	dispatchers.Register("default", NewDefaultDispatcher)
 }

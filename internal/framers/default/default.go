@@ -1,4 +1,4 @@
-package noopgo
+package defaultframer
 
 import (
 	"encoding/binary"
@@ -8,7 +8,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 )
 
-type SimpleFramer struct{}
+type DefaultFramer struct{}
 
 const (
 	MAGIC_BYTE_LEN   = 1
@@ -20,7 +20,7 @@ const (
 
 // Упаковка данных в протокол.
 // Заголовок: MagicByte(1) | MessageType(1) | ID(16) | Size(4)
-func (n *SimpleFramer) Frame(data []byte, messageType core.MessageType, requestId core.RequestID) ([]byte, error) {
+func (n *DefaultFramer) Frame(data []byte, messageType core.MessageType, requestId core.RequestID) ([]byte, error) {
 	headerLen := HEADER_SIZE_LEN
 	totalLen := headerLen + len(data)
 	frame := make([]byte, totalLen)
@@ -40,7 +40,7 @@ func (n *SimpleFramer) Frame(data []byte, messageType core.MessageType, requestI
 }
 
 // Распаковка данных из протокола
-func (n *SimpleFramer) Unframe(data []byte) ([]byte, core.MessageType, core.RequestID, error) {
+func (n *DefaultFramer) Unframe(data []byte) ([]byte, core.MessageType, core.RequestID, error) {
 	headerLen := HEADER_SIZE_LEN
 	if len(data) < headerLen {
 		return nil, core.MsgError, core.RequestID{}, core.ErrInsufficientHeaderLensth
@@ -70,13 +70,13 @@ func (n *SimpleFramer) Unframe(data []byte) ([]byte, core.MessageType, core.Requ
 }
 
 // Получение длины для заголовка данного протокола (в байтах)
-func (f *SimpleFramer) HeaderSize() int {
+func (f *DefaultFramer) HeaderSize() int {
 	return HEADER_SIZE_LEN
 }
 
 // Попытка получить длину данных payload, указанную в заголовке.
 // Если заголовок меньше необходимого - ошибка
-func (f *SimpleFramer) GetPayloadSize(data []byte) (int, error) {
+func (f *DefaultFramer) GetPayloadSize(data []byte) (int, error) {
 	if len(data) < f.HeaderSize() {
 		return -1, core.ErrInsufficientHeaderLensth
 	}
@@ -88,10 +88,10 @@ func (f *SimpleFramer) GetPayloadSize(data []byte) (int, error) {
 	return int(dataSize), nil
 }
 
-func NewSimpleFramer(cfg *config.Config) (core.Framer, error) {
-	return &SimpleFramer{}, nil
+func NewDefaultFramer(cfg *config.Config) (core.Framer, error) {
+	return &DefaultFramer{}, nil
 }
 
 func init() {
-	framers.Registrate("simple", NewSimpleFramer)
+	framers.Registrate("default", NewDefaultFramer)
 }
