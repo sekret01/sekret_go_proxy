@@ -35,7 +35,7 @@ func main() {
 	printRegistrates(hub)
 
 	hub.Info("START BUILD SERVER-APP MODULS")
-	server := buildServerTunApp(hub, cfg) // buildServerApp(hub, cfg) \ buildServerTunApp
+	server := buildServerApp(hub, cfg) // buildServerApp(hub, cfg) \ buildServerTunApp
 
 	admin := webadmin.NewAdmin(server, cfg, time.Hour)
 	hub.Info("RUN ADMIN-SERVER")
