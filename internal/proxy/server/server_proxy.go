@@ -12,7 +12,6 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-// type chanMap map[core.RequestID]chan []byte
 type chanMap map[core.RequestID]*proxy.SafeChannel
 
 type ServerProxy struct {
@@ -54,12 +53,6 @@ func (s *ServerProxy) GetUsers() []string {
 
 func (s *ServerProxy) NewHandshakeContext() *core.HandshakeContext {
 	ctx := &core.HandshakeContext{}
-	// clientIp, err := s.ipPool.Allocate()
-	// if err != nil {
-	// 	return nil
-	// }
-
-	// ctx.ClientIP = clientIp
 	return ctx
 }
 
@@ -107,7 +100,7 @@ func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeCh
 	if ch, ex := s.connChannels[requestId]; ex {
 		return ch
 	}
-	ch := proxy.NewSafeChannel() // make(chan []byte, 1000)
+	ch := proxy.NewSafeChannel()
 	s.connChannels[requestId] = ch
 	return ch
 }
@@ -130,13 +123,11 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 
 func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, decryptData []byte) {
 	s.chanMutex.RLock()
-	// defer s.chanMutex.RUnlock()
 	safeChannel, ex := s.connChannels[requestId]
 	s.chanMutex.RUnlock()
 	if !ex {
 		return
 	}
-	// channel <- decryptData
 	if ok := safeChannel.Put(decryptData); ok {
 		s.logger.Debug("[putMessageIntoChannel] put new message [" + utils.RequestIdToString(requestId) + "] ")
 	} else {
@@ -156,11 +147,6 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 			targetCon.Write(data)
 		}
 	}
-	// for data := range channel {
-	// 	s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
-	// 	targetCon.Write(data)
-	// }
-	// s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "] ")
 }
 
 func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, tunNode *proxy.TunnelNode) {
