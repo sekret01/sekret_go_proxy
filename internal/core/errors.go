@@ -17,6 +17,7 @@ var (
 
 	ErrInsufficientHeaderLensth  = errors.New("Insufficient length to read the header")
 	ErrInsufficientPayloadLensth = errors.New("Insufficient length to read payload")
+	ErrPayloadSizeTooLarge       = errors.New("payload size exceeds max")
 
 	ErrAythFailed = errors.New("Authentication failed")
 

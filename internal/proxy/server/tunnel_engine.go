@@ -11,8 +11,6 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type chanMap map[core.RequestID]chan []byte
-
 type TunnelNodeWrapper struct {
 	node       *proxy.TunnelNode
 	ip         string

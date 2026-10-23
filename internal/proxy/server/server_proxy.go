@@ -12,6 +12,9 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
+// type chanMap map[core.RequestID]chan []byte
+type chanMap map[core.RequestID]*proxy.SafeChannel
+
 type ServerProxy struct {
 	tunnelEngine *ServerTunnelEngine
 	dispatcher   core.Dispatcher
@@ -98,13 +101,13 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 	}
 }
 
-func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) chan []byte {
+func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeChannel { // chan []byte
 	s.chanMutex.Lock()
 	defer s.chanMutex.Unlock()
 	if ch, ex := s.connChannels[requestId]; ex {
 		return ch
 	}
-	ch := make(chan []byte, 1000)
+	ch := proxy.NewSafeChannel() // make(chan []byte, 1000)
 	s.connChannels[requestId] = ch
 	return ch
 }
@@ -127,22 +130,37 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 
 func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, decryptData []byte) {
 	s.chanMutex.RLock()
-	defer s.chanMutex.RUnlock()
-	channel, ex := s.connChannels[requestId]
+	// defer s.chanMutex.RUnlock()
+	safeChannel, ex := s.connChannels[requestId]
+	s.chanMutex.RUnlock()
 	if !ex {
 		return
 	}
-	channel <- decryptData
-	s.logger.Debug("[putMessageIntoChannel] put new message [" + utils.RequestIdToString(requestId) + "] ")
+	// channel <- decryptData
+	if ok := safeChannel.Put(decryptData); ok {
+		s.logger.Debug("[putMessageIntoChannel] put new message [" + utils.RequestIdToString(requestId) + "] ")
+	} else {
+		s.logger.Debug("[putMessageIntoChannel] WARNING cannot put msg [" + utils.RequestIdToString(requestId) + "] into channel")
+	}
 }
 
-func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel chan []byte, targetCon net.Conn) {
+func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.SafeChannel, targetCon net.Conn) { // channel chan []byte
 	s.logger.Debug("[conChannelReader] start read chan for [" + utils.RequestIdToString(requestId) + " ]")
-	for data := range channel {
-		s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
-		targetCon.Write(data)
+	for {
+		select {
+		case <-channel.Done():
+			s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "] ")
+			return
+		case data := <-channel.GetChannel():
+			s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
+			targetCon.Write(data)
+		}
 	}
-	s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "] ")
+	// for data := range channel {
+	// 	s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
+	// 	targetCon.Write(data)
+	// }
+	// s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "] ")
 }
 
 func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, tunNode *proxy.TunnelNode) {
@@ -181,7 +199,8 @@ func (s *ServerProxy) closeChannel(requestId core.RequestID) {
 	s.chanMutex.Lock()
 	defer s.chanMutex.Unlock()
 	if ch, ex := s.connChannels[requestId]; ex {
-		close(ch)
+		ch.Close()
+		// close(ch)
 		delete(s.connChannels, requestId)
 	}
 	s.logger.Debug("[closeChannel] close target-channel for [" + utils.RequestIdToString(requestId) + " ]")
