@@ -7,6 +7,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
@@ -15,12 +16,14 @@ type CompositeHandshakeAuth struct {
 	steps        []core.HandshakeStep
 	logger       logger.Logger
 	ctxGenerator core.HandshakeContextGenerator
+	enc          core.Encryptor
 }
 
 func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
+	secureConn := core.NewSecureConn(conn, a.enc)
 	for _, step := range a.steps {
-		if err := step.ServerSide(ctx, conn); err != nil {
+		if err := step.ServerSide(ctx, secureConn); err != nil {
 			return ctx, err
 		}
 	}
@@ -29,15 +32,20 @@ func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.Handshake
 
 func (a *CompositeHandshakeAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
+	secureConn := core.NewSecureConn(conn, a.enc)
 	for _, step := range a.steps {
-		if err := step.ClientSide(ctx, conn); err != nil {
+		if err := step.ClientSide(ctx, secureConn); err != nil {
 			return ctx, err
 		}
 	}
 	return ctx, nil
 }
 
-func NewConpositeHandshakeAuth(cfg *config.Config, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error) {
+func NewConpositeHandshakeAuth(
+	cfg *config.Config,
+	ctxGenerator core.HandshakeContextGenerator,
+	sessionKey []byte,
+) (core.Auth, error) {
 	steps := make([]core.HandshakeStep, 0)
 	for _, name := range cfg.HandshakeSteps {
 		step, err := handshake.NewHandshake(cfg, name)
@@ -48,10 +56,15 @@ func NewConpositeHandshakeAuth(cfg *config.Config, ctxGenerator core.HandshakeCo
 		fmt.Println("add step: " + name)
 		steps = append(steps, step)
 	}
+	enc, err := encryptors.NewEncryptor(cfg.EncryptorType, sessionKey, cfg)
+	if err != nil {
+		return nil, err
+	}
 	return &CompositeHandshakeAuth{
 		steps:        steps,
 		logger:       logger.GetLoggerHub().WithModule("CompositeHandshakeAuth"),
 		ctxGenerator: ctxGenerator,
+		enc:          enc,
 	}, nil
 }
 
