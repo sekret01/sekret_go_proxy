@@ -1,6 +1,6 @@
 # Протоколы программы
 
-## Simple (SimpleFramer)
+## Default (DefaultFramer)
 
 ### Формат сообщения
 
@@ -20,3 +20,4 @@
 | `MsgData` | 0x02 | Хост:порт (например, `example.com:80`) |
 | `MsgClose` | 0x03 | (пусто) |
 | `MsgError` | 0x04 | Текст ошибки |
+| `MsgPacket` | 0x05 |IP-пакет|
