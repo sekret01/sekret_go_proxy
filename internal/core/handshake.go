@@ -8,6 +8,11 @@ type HandshakeStep interface {
 	ServerSide(ctx *HandshakeContext, conn net.Conn) error
 }
 
+type Bootstrap interface {
+	ClientBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error)
+	ServerBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error)
+}
+
 type HandshakeContext struct {
 	ClientIP string
 }
