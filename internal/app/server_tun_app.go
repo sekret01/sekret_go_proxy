@@ -1,6 +1,8 @@
 package app
 
 import (
+	"runtime"
+
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -72,7 +74,7 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 		logger.GetLoggerHub().WithModule("ServerTunnelEngine"),
 	)
 
-	packetDevice, err := packets.NewPacketDevice("linux", cfg) // TODO конфиг / env
+	packetDevice, err := packets.NewPacketDevice(runtime.GOOS, cfg) // TODO конфиг / env
 	if err != nil {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildServerApp

@@ -28,7 +28,7 @@ func get(key string) (FactoryFunc, error) {
 	defer mu.RUnlock()
 	val, exist := factoryMap[key]
 	if !exist {
-		return nil, core.ErrInvalidTransportKey
+		return nil, core.ErrOsTypeNotSupported
 	}
 	return val, nil
 }
