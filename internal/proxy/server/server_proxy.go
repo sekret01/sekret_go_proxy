@@ -164,7 +164,7 @@ func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCo
 			size, err := targetCon.Read(buf)
 			if err != nil {
 				if !(errors.Is(err, net.ErrClosed) || err == io.EOF) {
-					s.logger.Warning("[targetConnectinoHandler] Client disconnect with error: " + err.Error())
+					s.logger.Debug("[targetConnectinoHandler] Client disconnect with error: " + err.Error())
 				}
 				return
 			}
