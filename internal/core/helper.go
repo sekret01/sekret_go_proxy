@@ -2,7 +2,6 @@ package core
 
 import (
 	"net"
-	"time"
 )
 
 // Интерфейс создателя HandshakeContext
@@ -30,39 +29,36 @@ func (c *HandshakeGeneratorConnector) NewHandshakeContext() *HandshakeContext {
 
 // Обертка net.Conn, шифрующая трафик
 type SecureConn struct {
-	con net.Conn
+	net.Conn
 	enc Encryptor
-	// key []byte
 }
 
 func (s *SecureConn) Write(b []byte) (n int, err error) {
-	data := s.enc.Encrypt(b)
-	return s.con.Write(data)
+	data := make([]byte, len(b))
+	data = s.enc.Encrypt(b)
+	if _, err := s.Conn.Write(data); err != nil {
+		return 0, err
+	}
+	return len(b), nil
 }
 
 func (s *SecureConn) Read(b []byte) (n int, err error) {
-	buf := []byte{}
-	n, err = s.con.Read(buf)
-	if err != nil {
-		return n, err
+	n, err = s.Conn.Read(b)
+	if n > 0 {
+		copy(b, s.enc.Decrypt(b))
 	}
-	b = s.enc.Decrypt(buf[:n])
-	return n, nil
+	return n, err
 }
-
-func (s *SecureConn) Close() error                       { return s.con.Close() }
-func (s *SecureConn) LocalAddr() net.Addr                { return s.con.LocalAddr() }
-func (s *SecureConn) RemoteAddr() net.Addr               { return s.con.RemoteAddr() }
-func (s *SecureConn) SetDeadline(t time.Time) error      { return s.con.SetDeadline(t) }
-func (s *SecureConn) SetReadDeadline(t time.Time) error  { return s.con.SetReadDeadline(t) }
-func (s *SecureConn) SetWriteDeadline(t time.Time) error { return s.con.SetWriteDeadline(t) }
 
 func NewSecureConn(
 	con net.Conn,
 	enc Encryptor,
-) *SecureConn {
+) net.Conn {
+	if enc == nil {
+		return con
+	}
 	return &SecureConn{
-		con: con,
-		enc: enc,
+		Conn: con,
+		enc:  enc,
 	}
 }
