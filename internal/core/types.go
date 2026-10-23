@@ -21,6 +21,11 @@ const MagicByte byte = 0x53
 // Ответ для запроса HTTPS CONNECT
 const HttpConnectResponse = "HTTP/1.1 200 Connection Established\r\n\r\n"
 
+// Размеры фрейма
+const (
+	MAX_PAYLOAD_SIZE = 16 << 20
+)
+
 // Типы протоколов
 const (
 	ProtoTest    ProtocolType = 127

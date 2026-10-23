@@ -56,6 +56,9 @@ func (n *SimpleFramer) Unframe(data []byte) ([]byte, core.MessageType, core.Requ
 	requestId := [ID_LEN]byte(data[offset : offset+ID_LEN])
 	offset += ID_LEN
 	dataSize := binary.BigEndian.Uint32(data[offset : offset+PAYLOAD_SIZE_LEN])
+	if dataSize > core.MAX_PAYLOAD_SIZE {
+		return nil, core.MsgError, core.RequestID{}, core.ErrInsufficientPayloadLensth
+	}
 	offset += PAYLOAD_SIZE_LEN
 
 	if uint32(len(data)) < dataSize+uint32(headerLen) {
@@ -79,6 +82,9 @@ func (f *SimpleFramer) GetPayloadSize(data []byte) (int, error) {
 	}
 	offset := MAGIC_BYTE_LEN + MESSAGE_TYPE_LEN + ID_LEN
 	dataSize := binary.BigEndian.Uint32(data[offset : offset+PAYLOAD_SIZE_LEN])
+	if dataSize > core.MAX_PAYLOAD_SIZE {
+		return -1, core.ErrInsufficientPayloadLensth
+	}
 	return int(dataSize), nil
 }
 

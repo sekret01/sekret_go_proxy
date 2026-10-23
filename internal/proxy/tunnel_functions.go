@@ -92,6 +92,9 @@ func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]b
 	if err != nil {
 		return nil, err
 	}
+	if payloadSize < 0 || payloadSize > core.MAX_PAYLOAD_SIZE {
+		return nil, core.ErrInsufficientPayloadLensth
+	}
 	bufPayload := make([]byte, payloadSize)
 	if _, err := io.ReadFull(serverTonnelConn, bufPayload); err != nil {
 		return nil, err
