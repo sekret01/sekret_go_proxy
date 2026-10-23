@@ -6,6 +6,7 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -35,6 +36,7 @@ type ServerTunnelEngine struct {
 	transport      core.Transport
 	encryptor      core.Encryptor
 	framer         core.Framer
+	bootstrap      core.Bootstrap
 	auth           core.Auth
 	tunnelNodesMap map[string]*TunnelNodeWrapper
 	tunnelsChannel chan *TunnelNodeWrapper
@@ -46,6 +48,7 @@ type ServerTunnelEngine struct {
 
 	logger logger.Logger
 	status *proxy.TunnelStatus
+	cfg    *config.Config
 }
 
 func (s *ServerTunnelEngine) RunTunnel() error {
@@ -133,9 +136,18 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 				return nil
 			}
 		}
+		_, key, err := s.bootstrap.ServerBootstrap(con)
+		enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
+		if err != nil {
+			s.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
+			con.Close()
+			continue
+		}
+		s.auth.SetEncryptor(enc)
 		ctx, err := s.auth.ServerHandshake(con)
 		if err != nil {
 			s.logger.Warning("[listenConnectoins] Handshake error: " + err.Error())
+			con.Close()
 			continue
 		}
 		s.logger.Debug("[listenConnectoins] auth success")
@@ -206,6 +218,7 @@ func NewServerTunnelEngine(
 	transport core.Transport,
 	encryptor core.Encryptor,
 	framer core.Framer,
+	bootstrap core.Bootstrap,
 	auth core.Auth,
 	cfg *config.Config,
 	logger logger.Logger,
@@ -214,6 +227,7 @@ func NewServerTunnelEngine(
 		transport:      transport,
 		encryptor:      encryptor,
 		framer:         framer,
+		bootstrap:      bootstrap,
 		auth:           auth,
 		tunnelNodesMap: make(map[string]*TunnelNodeWrapper, 100),
 		tunnelsChannel: make(chan *TunnelNodeWrapper, 100),
@@ -221,6 +235,7 @@ func NewServerTunnelEngine(
 		mainListener:   nil,
 		logger:         logger,
 		status:         proxy.NewTunnelStatus(),
+		cfg:            cfg,
 	}
 	return engine
 }

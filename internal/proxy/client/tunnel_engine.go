@@ -7,6 +7,7 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -23,6 +24,7 @@ type TunnelEngine struct {
 	encryptor  core.Encryptor // Шифрование и расшифровка
 	framer     core.Framer    // Оборачивание и парсинг самописных протоколов
 	auth       core.Auth
+	bootstrap  core.Bootstrap
 
 	remoteAddr string // Адрес удаленного узла для подключения
 
@@ -33,6 +35,7 @@ type TunnelEngine struct {
 
 	status *proxy.TunnelStatus // Состояние работы
 	ctx    *core.HandshakeContext
+	cfg    *config.Config
 }
 
 func (t *TunnelEngine) ConnectToTunnel() error {
@@ -44,6 +47,13 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 		return err
 	}
 	t.logger.Info("Try authenticate")
+	_, key, err := t.bootstrap.ClientBootstrap(conn)
+	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
+	if err != nil {
+		t.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
+		return err
+	}
+	t.auth.SetEncryptor(enc)
 	t.ctx, err = t.auth.ClientHandshake(conn)
 	if err != nil {
 		t.status.SetStopped()
@@ -178,7 +188,9 @@ func NewTunnelEngine(
 	framer core.Framer,
 	cfg *config.Config,
 	logger logger.Logger,
-	auth core.Auth) *TunnelEngine {
+	auth core.Auth,
+	bootstrap core.Bootstrap,
+) *TunnelEngine {
 	engine := &TunnelEngine{
 		tunnelNode:      nil,
 		transport:       transport,
@@ -190,6 +202,8 @@ func NewTunnelEngine(
 		clientListeners: make([]ClientListener, 0),
 		tunnelMessages:  make(chan core.MessageData, 1000),
 		auth:            auth,
+		bootstrap:       bootstrap,
+		cfg:             cfg,
 	}
 	return engine
 }
