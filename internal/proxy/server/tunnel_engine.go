@@ -158,20 +158,6 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 		if err != nil {
 			continue
 		}
-		// _, key, err := s.bootstrap.ServerBootstrap(con)
-		// enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
-		// if err != nil {
-		// 	s.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
-		// 	con.Close()
-		// 	continue
-		// }
-		// s.auth.SetEncryptor(enc)
-		// ctx, err := s.auth.ServerHandshake(con)
-		// if err != nil {
-		// 	s.logger.Warning("[listenConnectoins] Handshake error: " + err.Error())
-		// 	con.Close()
-		// 	continue
-		// }
 		s.logger.Debug("[listenConnectoins] auth success")
 		tunnelNode := proxy.NewTunnelNode(con, s.framer)
 		msgChannel := make(chan core.MessageData, 1000)

@@ -52,19 +52,6 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 		return nil
 	}
 	t.logger.Debug("[ConnectToTunnel] auth success")
-	// _, key, err := t.bootstrap.ClientBootstrap(conn)
-	// enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
-	// if err != nil {
-	// 	t.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
-	// 	return err
-	// }
-	// t.auth.SetEncryptor(enc)
-	// t.ctx, err = t.auth.ClientHandshake(conn)
-	// if err != nil {
-	// 	t.status.SetStopped()
-	// 	t.logger.Error(err.Error())
-	// 	return err
-	// }
 	t.status.SetRunning()
 	t.tunnelNode = proxy.NewTunnelNode(conn, t.framer)
 	go t.tunnelReader()
