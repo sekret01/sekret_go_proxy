@@ -10,8 +10,9 @@ type Config struct {
 }
 
 type ConnectionConfig struct {
-	LocalHost  string `yaml:"localhost"`
-	RemoteHost string `yaml:"remotehost"`
+	ConnectionType string `yaml:"connection_type"`
+	LocalHost      string `yaml:"localhost"`
+	RemoteHost     string `yaml:"remotehost"`
 }
 
 type ModuleConfig struct {

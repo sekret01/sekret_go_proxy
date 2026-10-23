@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,7 +37,11 @@ func main() {
 	printRegistrates(hub)
 
 	hub.Info("START BUILD CLIENT-APP MODULS")
-	client := builClientApp(hub, cfg) // builClientApp(hub, cfg)    builClientTunApp
+	client, err := buildServerApp(hub, cfg)
+	if err != nil {
+		hub.Error(err.Error())
+		return
+	}
 
 	admin := webadmin.NewAdmin(client, cfg, time.Hour)
 	hub.Info("RUN ADMIN-SERVER")
@@ -90,7 +95,18 @@ func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
 	}
 }
 
-func builClientApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientApp {
+func buildServerApp(hub logger.LoggerHub, cfg *config.Config) (webadmin.Controllable, error) {
+	switch cfg.ConnectionType {
+	case "proxy":
+		return builClientProxyApp(hub, cfg), nil
+	case "vpn":
+		return builClientTunApp(hub, cfg), nil
+	default:
+		return nil, errors.New("ConnectionType [ " + cfg.ConnectionType + " ] not supported")
+	}
+}
+
+func builClientProxyApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientApp {
 	client, err := app.NewClientApp(cfg)
 	if err != nil {
 		hub.Critical("[loadConfig]: " + err.Error())

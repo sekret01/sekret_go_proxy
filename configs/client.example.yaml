@@ -1,4 +1,5 @@
 connection:
+  connection_type:
   localhost: 
   remotehost: 
 
@@ -8,6 +9,7 @@ modules:
   framer_type: 
   dispatcher_type: 
   auth_type: 
+  handshake_steps: 
 
 logs:
   log_level: 

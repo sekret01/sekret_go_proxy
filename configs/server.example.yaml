@@ -1,5 +1,7 @@
 connection:
+  connection_type: 
   localhost: 
+  remotehost: 
 
 modules:
   transport_type: 
@@ -7,6 +9,7 @@ modules:
   framer_type: 
   dispatcher_type: 
   auth_type: 
+  handshake_steps: []
 
 logs:
   log_level: 
@@ -20,3 +23,6 @@ admin:
   user: 
   password: 
   auto_run_proxy: 
+
+vpn:
+  subnet: 10.0.0.0/24
