@@ -14,31 +14,8 @@ var (
 	mu         sync.RWMutex
 )
 
-func Registrate(key string, factoryFunc FactoryFunc) {
-	mu.RLock()
-	defer mu.RUnlock()
-	if _, ex := factoryMap[key]; ex {
-		panic("PacketDevice [" + key + "] already exists")
-	}
-	factoryMap[key] = factoryFunc
-}
-
-func get(key string) (FactoryFunc, error) {
-	mu.RLock()
-	defer mu.RUnlock()
-	val, exist := factoryMap[key]
-	if !exist {
-		return nil, core.ErrOsTypeNotSupported
-	}
-	return val, nil
-}
-
 func NewPacketDevice(osType string, cfg *config.Config) (core.PacketDevice, error) {
-	factory, err := get(osType)
-	if err != nil {
-		return nil, err
-	}
-	return factory(cfg)
+	return newPacketDevice(cfg)
 }
 
 func List() []string {

@@ -7,6 +7,5 @@ import (
 	_ "github.com/sekret01/sekret_go_proxy/internal/encryptors/default"
 	_ "github.com/sekret01/sekret_go_proxy/internal/framers/default"
 	_ "github.com/sekret01/sekret_go_proxy/internal/handshake/ipstep"
-	_ "github.com/sekret01/sekret_go_proxy/internal/proxy/packets/linux"
 	_ "github.com/sekret01/sekret_go_proxy/internal/transports/tcp"
 )

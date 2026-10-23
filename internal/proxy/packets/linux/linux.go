@@ -12,7 +12,8 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
-	"github.com/sekret01/sekret_go_proxy/internal/proxy/packets"
+
+	// "github.com/sekret01/sekret_go_proxy/internal/proxy/packets"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"golang.org/x/sys/unix"
 )
@@ -207,9 +208,9 @@ func NewLinuxPacketDevice(cfg *config.Config) (core.PacketDevice, error) {
 		nil
 }
 
-func init() {
-	packets.Registrate("linux", NewLinuxPacketDevice)
-}
+// func init() {
+// 	packets.Registrate("linux", NewLinuxPacketDevice)
+// }
 
 func getIpFromHost(host string) (string, error) {
 	h, _, err := net.SplitHostPort(host)
