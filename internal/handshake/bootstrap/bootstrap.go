@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -44,10 +45,10 @@ func helloMsgToBytes(msg HelloMsg) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-type BaseBootStrap struct {
+type BaseBootstrap struct {
 }
 
-func (b *BaseBootStrap) ClientBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error) {
+func (b *BaseBootstrap) ClientBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error) {
 	curve := ecdh.X25519()
 	clientPrivateKey, _ := curve.GenerateKey(rand.Reader)
 	clientPublicKey := clientPrivateKey.PublicKey()
@@ -66,7 +67,7 @@ func (b *BaseBootStrap) ClientBootstrap(con net.Conn) (steps []string, sessionKe
 	con.Write(bytesData)
 
 	// keys
-	buf := []byte{}
+	buf := make([]byte, 100)
 	n, err := con.Read(buf)
 	if err != nil {
 		return nil, nil, err
@@ -94,8 +95,8 @@ func (b *BaseBootStrap) ClientBootstrap(con net.Conn) (steps []string, sessionKe
 	return nil, clientWriteKey, nil
 
 }
-func (b *BaseBootStrap) ServerBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error) {
-	buf := []byte{}
+func (b *BaseBootstrap) ServerBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error) {
+	buf := make([]byte, 100)
 	n, err := con.Read(buf)
 	if err != nil {
 		return nil, nil, err
@@ -139,4 +140,8 @@ func (b *BaseBootStrap) ServerBootstrap(con net.Conn) (steps []string, sessionKe
 	}
 	return nil, serverWriteKey, nil
 
+}
+
+func NewBaseBootstrap() core.Bootstrap {
+	return &BaseBootstrap{}
 }

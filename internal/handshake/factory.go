@@ -6,6 +6,7 @@ import (
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/handshake/bootstrap"
 )
 
 type FactoryFunc func(*config.Config) (core.HandshakeStep, error)
@@ -41,6 +42,10 @@ func NewHandshake(cfg *config.Config, name string) (core.HandshakeStep, error) {
 		return nil, err
 	}
 	return factory(cfg)
+}
+
+func NewBootstrap(cfg config.Config) core.Bootstrap {
+	return bootstrap.NewBaseBootstrap()
 }
 
 func List() []string {
