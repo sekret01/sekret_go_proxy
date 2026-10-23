@@ -8,6 +8,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
+	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/server"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
@@ -45,7 +46,7 @@ func (p *ServerApp) GetLogs() []logger.LogMessage {
 func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess := true
 
-	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, cfg)
+	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, []byte(cfg.Key32Bytes), cfg) // TODO убрать []]byte(cfg.Key32Bytes)
 	buildSuccess = buildSuccess && isContinue(err)
 	transport, err := transports.NewTransport(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
@@ -57,6 +58,7 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
+	bootstrap := handshake.NewBootstrap(*cfg)
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
@@ -67,6 +69,7 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 		transport,
 		encryptor,
 		framer,
+		bootstrap,
 		auth,
 		cfg,
 		logger.GetLoggerHub().WithModule("ServerTunnelEngine"),

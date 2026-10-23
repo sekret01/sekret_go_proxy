@@ -6,6 +6,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
+	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/packets"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/server"
@@ -44,7 +45,7 @@ func (p *ServerTunApp) GetLogs() []logger.LogMessage {
 func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 	buildSuccess := true
 
-	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, cfg)
+	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, []byte(cfg.Key32Bytes), cfg) // TODO убрать []]byte(cfg.Key32Bytes)
 	buildSuccess = buildSuccess && isContinue(err)
 	transport, err := transports.NewTransport(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
@@ -54,6 +55,7 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
 	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
+	bootstrap := handshake.NewBootstrap(*cfg)
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
@@ -64,6 +66,7 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 		transport,
 		encryptor,
 		framer,
+		bootstrap,
 		auth,
 		cfg,
 		logger.GetLoggerHub().WithModule("ServerTunnelEngine"),
