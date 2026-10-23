@@ -8,7 +8,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-type factoryFunc func(config *config.Config) (core.Auth, error)
+type factoryFunc func(config *config.Config, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error)
 
 var (
 	authMap = make(map[string]factoryFunc)
@@ -35,12 +35,12 @@ func get(key string) (factoryFunc, error) {
 	return encr, nil
 }
 
-func NewEncryptor(config *config.Config) (core.Auth, error) {
+func NewAuth(config *config.Config, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error) {
 	factory, err := get(config.AuthType)
 	if err != nil {
 		return nil, err
 	}
-	return factory(config)
+	return factory(config, ctxGenerator)
 }
 
 func List() []string {

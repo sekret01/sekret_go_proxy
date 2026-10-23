@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/app"
@@ -19,6 +23,8 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	hub := setupLogger()
 	hub.Info("START APP")
@@ -30,15 +36,24 @@ func main() {
 	printRegistrates(hub)
 
 	hub.Info("START BUILD SERVER-APP MODULS")
-	server := buildServerApp(hub, cfg)
-
-	hub.Info("RUN ADMIN-SERVER")
-	admin := webadmin.NewAdmin(server, cfg, time.Hour)
-	err := admin.Start(cfg.AdminHost)
+	server, err := buildServerApp(hub, cfg)
 	if err != nil {
 		hub.Error(err.Error())
+		return
 	}
-	select {}
+
+	admin := webadmin.NewAdmin(server, cfg, time.Hour)
+	hub.Info("RUN ADMIN-SERVER")
+	go func() {
+		err := admin.Start(cfg.AdminHost)
+		if err != nil {
+			hub.Error(err.Error())
+		}
+	}()
+
+	<-ctx.Done()
+	hub.Info("shutdown signal")
+	admin.Stop(ctx)
 }
 
 func loadConfig(hub logger.LoggerHub) *config.Config {
@@ -54,10 +69,10 @@ func setupLogger() logger.LoggerHub {
 	hub := logger.GetLoggerHub()
 	consoleLogger := loggers.NewConsoleLogger()
 	bufferLogger := loggers.NewBufferLogger()
-	fileLogger := loggers.NewFileLogger()
+	// fileLogger := loggers.NewFileLogger()
 	hub.Registrate(consoleLogger)
 	hub.Registrate(bufferLogger)
-	hub.Registrate(fileLogger)
+	// hub.Registrate(fileLogger)
 	hub.RegisterBuffer(bufferLogger)
 	hub.SetLevel(logger.INFO)
 	return hub
@@ -81,10 +96,30 @@ func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
 	}
 }
 
-func buildServerApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerApp {
+func buildServerApp(hub logger.LoggerHub, cfg *config.Config) (webadmin.Controllable, error) {
+	switch cfg.ConnectionType {
+	case "proxy":
+		return buildServerProxyApp(hub, cfg), nil
+	case "vpn":
+		return buildServerTunApp(hub, cfg), nil
+	default:
+		return nil, errors.New("ConnectionType [ " + cfg.ConnectionType + " ] not supported")
+	}
+}
+
+func buildServerProxyApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerApp {
 	server, err := app.NewServerApp(cfg)
 	if err != nil {
-		hub.Critical("[loadConfig]: " + err.Error())
+		hub.Critical("[buildServerApp]: " + err.Error())
+		criticalExit()
+	}
+	return server
+}
+
+func buildServerTunApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerTunApp {
+	server, err := app.NewServerTunApp(cfg)
+	if err != nil {
+		hub.Critical("[buildServerTunApp]: " + err.Error())
 		criticalExit()
 	}
 	return server

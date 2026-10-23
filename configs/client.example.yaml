@@ -1,23 +1,25 @@
 connection:
-  localhost: 
+  connection_type: proxy
+  localhost: 127.0.0.1:15985
   remotehost: 
 
 modules:
-  transport_type: 
-  encryptor_type: 
-  framer_type: 
-  dispatcher_type: 
-  auth_type: 
+  transport_type: tcp
+  encryptor_type: default
+  framer_type: default
+  dispatcher_type: default
+  auth_type: default
+  handshake_steps: []
 
 logs:
-  log_level: 
+  log_level: INFO
 
 secure:
   key_32_bytes: 
 
 admin:
-  adminhost: 
-  authentication: 
+  adminhost: 127.0.0.1:12345
+  authentication: none
   user: 
   password: 
-  auto_run_proxy: 
+  auto_run_proxy: true

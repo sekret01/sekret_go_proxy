@@ -21,6 +21,11 @@ const MagicByte byte = 0x53
 // Ответ для запроса HTTPS CONNECT
 const HttpConnectResponse = "HTTP/1.1 200 Connection Established\r\n\r\n"
 
+// Размеры фрейма
+const (
+	MAX_PAYLOAD_SIZE = 16 << 20
+)
+
 // Типы протоколов
 const (
 	ProtoTest    ProtocolType = 127
@@ -35,6 +40,7 @@ const (
 	MsgData    MessageType = 2
 	MsgClose   MessageType = 3
 	MsgError   MessageType = 4
+	MsgPacket  MessageType = 5
 )
 
 // STRUCTS
@@ -45,6 +51,12 @@ type ConnWrapper struct {
 	Conn      net.Conn
 	ProtoType ProtocolType // Тип протокола (HTTP, SOCKS5)
 	IsTunnel  bool         // нужно ли держать открытым (HTTP false)
+}
+
+type MessageData struct {
+	MsgType   MessageType
+	RequestId RequestID
+	Data      []byte
 }
 
 type ConnectData struct {

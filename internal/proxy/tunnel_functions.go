@@ -92,6 +92,9 @@ func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]b
 	if err != nil {
 		return nil, err
 	}
+	if payloadSize < 0 || payloadSize > core.MAX_PAYLOAD_SIZE {
+		return nil, core.ErrPayloadSizeTooLarge
+	}
 	bufPayload := make([]byte, payloadSize)
 	if _, err := io.ReadFull(serverTonnelConn, bufPayload); err != nil {
 		return nil, err
@@ -100,7 +103,7 @@ func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]b
 	return frame, nil
 }
 
-func closeConnection(dispatcher core.Dispatcher, requestId core.RequestID) {
+func CloseConnection(dispatcher core.Dispatcher, requestId core.RequestID) {
 	conWrapper, ok := dispatcher.Find(requestId)
 	con := conWrapper.Conn
 	if !ok {

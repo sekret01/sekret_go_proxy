@@ -4,7 +4,7 @@
 |компонент|пакет|описание (за что отвечает)|
 |-|-|-|
 |client|internal/proxy/client|прием запросов от браузеров/приложений, шифровка, направление в следующий узел|
-|server|internal/proxy/client|прием запросов от узла, расшифровка, отправление на target-сервер, отправление ответа на узел|
+|server|internal/proxy/server|прием запросов от узла, расшифровка, отправление на target-сервер, отправление ответа на узел|
 
 ## модули и интерфейсы
 
@@ -32,6 +32,7 @@ type Dispatcher interface {
 type Auth interface {
 	ServerHandshake(conn net.Conn) ([]byte, error)
 	ClientHandshake(conn net.Conn) ([]byte, error)
+	SetEncryptor(Encryptor)
 }
 ```
 
@@ -63,4 +64,14 @@ type Transport interface {
 	Dial(address string) (net.Conn, error)
 }
 ```
+## Доступные модули для выбора в конфиге
 
+Все модули, добавленные по умолчанию, называются `default` (кроме Encryptor `chacha20` и Auth `composite_handshake`). Все настройки модулей клиента должны совпадать с сервером, иначе обмен и расшифровка данных будет происходить с ошибками.
+
+|пакет модулей|описание|доступные модули по умолчанию|
+|-|-|-|
+|**transport_type**|тип транспортного уровня для туннеля|tcp, udp|
+|**encryptor_type**|тип шифровальщика|default, chacha20|
+|**framer_type**|тип фреймера протокола|default|
+|**dispatcher_type**|тип диспетчера|default|
+|**auth_type**|тип авторизации и аутентификации|default, composite_handshake|

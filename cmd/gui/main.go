@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -12,8 +10,8 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger/loggers"
 
-	_ "github.com/sekret01/sekret_go_proxy/internal/encryptors/mock"
-	_ "github.com/sekret01/sekret_go_proxy/internal/framers/simple"
+	_ "github.com/sekret01/sekret_go_proxy/internal/encryptors/default"
+	_ "github.com/sekret01/sekret_go_proxy/internal/framers/default"
 	_ "github.com/sekret01/sekret_go_proxy/internal/transports/tcp"
 )
 
@@ -43,7 +41,6 @@ func buildGui() {
 
 	hub := setupLogger()
 	cfg, err := loadConfig()
-	fmt.Println(cfg)
 	if err != nil {
 		hub.Error("Error load config " + err.Error())
 		return

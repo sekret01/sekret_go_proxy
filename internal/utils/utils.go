@@ -2,6 +2,8 @@ package utils
 
 import (
 	"encoding/hex"
+	"errors"
+	"os/exec"
 	"strconv"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -37,4 +39,13 @@ func IntToString(num int) string {
 
 func MessageTypeToHexString(msgType core.MessageType) string {
 	return IntToString(int(msgType))
+}
+
+func ShRun(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	res, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.New("ShRun error: " + err.Error() + " , res: " + string(res))
+	}
+	return nil
 }

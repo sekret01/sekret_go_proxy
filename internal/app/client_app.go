@@ -8,13 +8,15 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
+	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
+	"github.com/sekret01/sekret_go_proxy/internal/proxy/client"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type ClientApp struct {
-	tunnel *proxy.ClientTunnel
+	tunnel *client.ClientProxy
 }
 
 func (p *ClientApp) Start() error {
@@ -44,7 +46,7 @@ func (p *ClientApp) GetLogs() []logger.LogMessage {
 func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess := true
 
-	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, cfg)
+	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, []byte(cfg.Key32Bytes), cfg) // TODO убрать []]byte(cfg.Key32Bytes)
 	buildSuccess = buildSuccess && isContinue(err)
 	transport, err := transports.NewTransport(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
@@ -52,23 +54,35 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	dispatcher, err := dispatchers.NewDispatcher(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
-	auth, err := auths.NewEncryptor(cfg)
+	ctxGenConnector := &core.HandshakeGeneratorConnector{}
+	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
+	bootstrap := handshake.NewBootstrap(*cfg)
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildClientApp
 	}
 
-	tunnel := proxy.NewClientTunnel(transport,
+	tunnelEngin := client.NewTunnelEngine(
+		transport,
 		encryptor,
 		framer,
-		dispatcher,
-		detector,
 		cfg,
-		logger.GetLoggerHub().WithModule("ClientApp"),
-		auth)
+		logger.GetLoggerHub().WithModule("TunnelEngine"),
+		auth,
+		bootstrap,
+	)
+
+	tunnel := client.NewClientProxy(
+		tunnelEngin,
+		detector,
+		dispatcher,
+		cfg,
+		logger.GetLoggerHub().WithModule("ClientProxy"),
+	)
+	ctxGenConnector.SubscribeGenerator(tunnel)
 	return &ClientApp{
 		tunnel: tunnel,
 	}, nil

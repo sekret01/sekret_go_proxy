@@ -9,7 +9,7 @@ import (
 )
 
 // Функция-фабрика для создания Encryptor
-type factoryFunc func(config *config.Config) (core.Encryptor, error)
+type factoryFunc func(key []byte, config *config.Config) (core.Encryptor, error)
 
 var (
 	encryptionsMap = make(map[string]factoryFunc)
@@ -39,12 +39,12 @@ func get(key string) (factoryFunc, error) {
 }
 
 // Создание нового Encryption, выбор в конфигах
-func NewEncryptor(key string, config *config.Config) (core.Encryptor, error) {
-	factory, err := get(key)
+func NewEncryptor(name string, key []byte, config *config.Config) (core.Encryptor, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}
-	return factory(config)
+	return factory(key, config)
 }
 
 func List() []string {

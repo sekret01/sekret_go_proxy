@@ -17,20 +17,6 @@ type ChaCha20Encryptor struct {
 	aead cipher.AEAD
 }
 
-func NewChaCha20(cfg *config.Config) (core.Encryptor, error) {
-	key := cfg.Key32Bytes
-	if len(key) != chacha20poly1305.KeySize {
-		return nil, errors.New("key must be 32 bytes for ChaCha20-Poly1305")
-	}
-
-	aead, err := chacha20poly1305.New([]byte(key))
-	if err != nil {
-		return nil, err
-	}
-
-	return &ChaCha20Encryptor{aead: aead}, nil
-}
-
 // [Nonce (12 байт)] + [Зашифрованные данные + Tag (16 байт)]
 func (c *ChaCha20Encryptor) Encrypt(plaintext []byte) []byte {
 	nonce := make([]byte, c.aead.NonceSize())
@@ -54,6 +40,19 @@ func (c *ChaCha20Encryptor) Decrypt(ciphertext []byte) []byte {
 		return nil
 	}
 	return plaintext
+}
+
+func NewChaCha20(key []byte, cfg *config.Config) (core.Encryptor, error) {
+	if len(key) != chacha20poly1305.KeySize {
+		return nil, errors.New("key must be 32 bytes for ChaCha20-Poly1305")
+	}
+
+	aead, err := chacha20poly1305.New([]byte(key))
+	if err != nil {
+		return nil, err
+	}
+
+	return &ChaCha20Encryptor{aead: aead}, nil
 }
 
 func init() {

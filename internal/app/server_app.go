@@ -8,13 +8,15 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
+	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
+	"github.com/sekret01/sekret_go_proxy/internal/proxy/server"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type ServerApp struct {
-	tunnel *proxy.ServerTunnel
+	tunnel *server.ServerProxy
 }
 
 func (s *ServerApp) Start() error {
@@ -44,7 +46,7 @@ func (p *ServerApp) GetLogs() []logger.LogMessage {
 func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess := true
 
-	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, cfg)
+	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, []byte(cfg.Key32Bytes), cfg) // TODO убрать []]byte(cfg.Key32Bytes)
 	buildSuccess = buildSuccess && isContinue(err)
 	transport, err := transports.NewTransport(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
@@ -52,24 +54,35 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	dispatcher, err := dispatchers.NewDispatcher(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
-	auth, err := auths.NewEncryptor(cfg)
+	ctxGenConnector := &core.HandshakeGeneratorConnector{}
+	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
+	bootstrap := handshake.NewBootstrap(*cfg)
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildServerApp
 	}
 
-	tunnel := proxy.NewServerTunnel(transport,
+	serverTunnelEngine := server.NewServerTunnelEngine(
+		transport,
 		encryptor,
 		framer,
+		bootstrap,
+		auth,
+		cfg,
+		logger.GetLoggerHub().WithModule("ServerTunnelEngine"),
+	)
+
+	proxy := server.NewServerProxy(
+		serverTunnelEngine,
 		dispatcher,
 		detector,
-		cfg,
-		logger.GetLoggerHub().WithModule("ServerApp"),
-		auth)
+		logger.GetLoggerHub().WithModule("ServerProxy"),
+	)
+	ctxGenConnector.SubscribeGenerator(proxy)
 	return &ServerApp{
-		tunnel: tunnel,
+		tunnel: proxy,
 	}, nil
 }

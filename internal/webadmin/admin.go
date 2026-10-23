@@ -1,6 +1,7 @@
 package webadmin
 
 import (
+	"context"
 	"crypto/subtle"
 	"embed"
 	"html/template"
@@ -22,6 +23,7 @@ type Admin struct {
 	tmpl         *template.Template
 	sessionStore *SessionStore
 	cfg          *config.Config
+	srv          *http.Server
 }
 
 func (a *Admin) Start(addr string) error {
@@ -43,7 +45,7 @@ func (a *Admin) Start(addr string) error {
 	mux.HandleFunc("/api/stop", a.auth(a.apiStop))
 	mux.HandleFunc("/users", a.auth(a.handlerUsers))
 
-	srv := &http.Server{
+	a.srv = &http.Server{
 		Addr:              addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -56,7 +58,22 @@ func (a *Admin) Start(addr string) error {
 	if a.cfg.AutoRunProxy {
 		go a.component.Start()
 	}
-	return srv.ListenAndServe()
+	errch := make(chan error, 1)
+	go func() {
+		err := a.srv.ListenAndServe()
+		if err != nil {
+			errch <- err
+		}
+	}()
+	return <-errch
+}
+
+func (a *Admin) Stop(ctx context.Context) error {
+	a.component.Stop()
+	if a.srv != nil {
+		a.srv.Shutdown(ctx)
+	}
+	return nil
 }
 
 func (a *Admin) checkUser(user, password string) bool {
@@ -72,5 +89,6 @@ func NewAdmin(component Controllable, cfg *config.Config, ttl time.Duration) *Ad
 		tmpl:         template.Must(template.ParseFS(templateFS, "templates/*.html")),
 		sessionStore: NewSessionStore(ttl),
 		cfg:          cfg,
+		srv:          nil,
 	}
 }
