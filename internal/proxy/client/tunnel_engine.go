@@ -43,23 +43,28 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 	conn, err := t.waitConnectionToTunnel()
 	if err != nil {
 		t.status.SetStopped()
-		t.logger.Warning("[ClientTunnel] :: connect remote addr -> " + err.Error())
+		t.logger.Warning("[ConnectToTunnel] :: connect remote addr -> " + err.Error())
 		return err
 	}
 	t.logger.Info("Try authenticate")
-	_, key, err := t.bootstrap.ClientBootstrap(conn)
-	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
-	if err != nil {
-		t.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
-		return err
-	}
-	t.auth.SetEncryptor(enc)
-	t.ctx, err = t.auth.ClientHandshake(conn)
-	if err != nil {
+	if err := t.authenticate(conn); err != nil {
 		t.status.SetStopped()
-		t.logger.Error(err.Error())
-		return err
+		return nil
 	}
+	t.logger.Debug("[ConnectToTunnel] auth success")
+	// _, key, err := t.bootstrap.ClientBootstrap(conn)
+	// enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
+	// if err != nil {
+	// 	t.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
+	// 	return err
+	// }
+	// t.auth.SetEncryptor(enc)
+	// t.ctx, err = t.auth.ClientHandshake(conn)
+	// if err != nil {
+	// 	t.status.SetStopped()
+	// 	t.logger.Error(err.Error())
+	// 	return err
+	// }
 	t.status.SetRunning()
 	t.tunnelNode = proxy.NewTunnelNode(conn, t.framer)
 	go t.tunnelReader()
@@ -92,6 +97,22 @@ func (t *TunnelEngine) SetLaunch() {
 
 func (t *TunnelEngine) SetStopped() {
 	t.status.SetStopped()
+}
+
+func (t *TunnelEngine) authenticate(conn net.Conn) error {
+	_, key, err := t.bootstrap.ClientBootstrap(conn)
+	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
+	if err != nil {
+		t.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
+		return err
+	}
+	t.auth.SetEncryptor(enc)
+	t.ctx, err = t.auth.ClientHandshake(conn)
+	if err != nil {
+		t.logger.Error("[authenticate] ClientHandshake error: " + err.Error())
+		return err
+	}
+	return nil
 }
 
 func (t *TunnelEngine) waitConnectionToTunnel() (net.Conn, error) {

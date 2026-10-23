@@ -124,6 +124,24 @@ func (s *ServerTunnelEngine) SetStopped() {
 	s.status.SetStopped()
 }
 
+func (s *ServerTunnelEngine) authenticate(conn net.Conn) (*core.HandshakeContext, error) {
+	_, key, err := s.bootstrap.ServerBootstrap(conn)
+	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
+	if err != nil {
+		s.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
+		conn.Close()
+		return nil, err
+	}
+	s.auth.SetEncryptor(enc)
+	ctx, err := s.auth.ServerHandshake(conn)
+	if err != nil {
+		s.logger.Warning("[authenticate] Handshake error: " + err.Error())
+		conn.Close()
+		return ctx, err
+	}
+	return ctx, nil
+}
+
 func (s *ServerTunnelEngine) listenConnectoins() error {
 	for {
 		con, err := s.mainListener.Accept()
@@ -136,20 +154,24 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 				return nil
 			}
 		}
-		_, key, err := s.bootstrap.ServerBootstrap(con)
-		enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
+		ctx, err := s.authenticate(con)
 		if err != nil {
-			s.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
-			con.Close()
 			continue
 		}
-		s.auth.SetEncryptor(enc)
-		ctx, err := s.auth.ServerHandshake(con)
-		if err != nil {
-			s.logger.Warning("[listenConnectoins] Handshake error: " + err.Error())
-			con.Close()
-			continue
-		}
+		// _, key, err := s.bootstrap.ServerBootstrap(con)
+		// enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
+		// if err != nil {
+		// 	s.logger.Warning("[listenConnectoins] Bootstrap encoder create error: " + err.Error())
+		// 	con.Close()
+		// 	continue
+		// }
+		// s.auth.SetEncryptor(enc)
+		// ctx, err := s.auth.ServerHandshake(con)
+		// if err != nil {
+		// 	s.logger.Warning("[listenConnectoins] Handshake error: " + err.Error())
+		// 	con.Close()
+		// 	continue
+		// }
 		s.logger.Debug("[listenConnectoins] auth success")
 		tunnelNode := proxy.NewTunnelNode(con, s.framer)
 		msgChannel := make(chan core.MessageData, 1000)
