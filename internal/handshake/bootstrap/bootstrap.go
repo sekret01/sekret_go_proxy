@@ -130,7 +130,7 @@ func (b *BaseBootstrap) ServerBootstrap(con net.Conn) (steps []string, sessionKe
 	if err != nil {
 		return nil, nil, err
 	}
-	salt := append(serverRandom, msg.Random[:]...)
+	salt := append(msg.Random[:], serverRandom...)
 	info := []byte("info for reader")
 	hkdfReader := hkdf.New(sha256.New, serverSharedSecret, salt, info)
 	serverWriteKey := make([]byte, 32)

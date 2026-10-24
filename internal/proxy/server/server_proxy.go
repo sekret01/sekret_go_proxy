@@ -52,7 +52,9 @@ func (s *ServerProxy) GetUsers() []string {
 }
 
 func (s *ServerProxy) NewHandshakeContext() *core.HandshakeContext {
-	ctx := &core.HandshakeContext{}
+	ctx := &core.HandshakeContext{} // TODO добавить генерацию 32b ключа
+	encKey := utils.Generate32ByteKey()
+	ctx.EncryptorKey = encKey
 	return ctx
 }
 

@@ -174,23 +174,42 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 				return nil
 			}
 		}
+		s.logger.Info("[listenConnectoins] Start auth [" + con.RemoteAddr().String() + "]")
 		ctx, err := s.authenticate(con)
 		if err != nil {
+			s.logger.Warning("[listenConnectoins] Auth [" + con.RemoteAddr().String() + "] fail :" + err.Error())
+			con.Close()
 			continue
 		}
-		s.logger.Debug("[listenConnectoins] auth success")
-		tunnelNode := proxy.NewTunnelNode(con, s.framer)
-		msgChannel := make(chan core.MessageData, 1000)
-		ip := con.RemoteAddr().String()
-		tunModuls := NewTunnelModules(s.encryptor) // TODO делать свой enc, генерить новый ключ
-		tunNodeWrapper := NewTunnelNodeWrapper(tunnelNode, ip, msgChannel, ctx, tunModuls)
+		s.logger.Info("[listenConnectoins] Auth success [" + con.RemoteAddr().String() + "]")
+		s.logger.Info("[listenConnectoins] Start configure tunnel node [" + con.RemoteAddr().String() + "]")
+		tunNodeWrapper, err := s.configureTunNodeWrapper(con, ctx)
+		if err != nil {
+			s.logger.Warning("[listenConnectoins] Configure tunnel node [ " + tunNodeWrapper.ip + " ] fail: " + err.Error())
+			con.Close()
+			continue
+		}
+		s.logger.Info("[listenConnectoins] Configure success [" + tunNodeWrapper.ip + "]")
 		s.connMutex.Lock()
-		s.tunnelNodesMap[ip] = tunNodeWrapper
+		s.tunnelNodesMap[tunNodeWrapper.ip] = tunNodeWrapper
 		s.connMutex.Unlock()
 		s.tunnelsChannel <- tunNodeWrapper
-		s.logger.Debug("[listenConnectoins] New connection: " + ip)
-		go s.tunnelReader(ip, tunNodeWrapper, msgChannel)
+		s.logger.Debug("[listenConnectoins] New connection: " + tunNodeWrapper.ip)
+		go s.tunnelReader(tunNodeWrapper.ip, tunNodeWrapper, tunNodeWrapper.msgChannel)
 	}
+}
+
+func (s *ServerTunnelEngine) configureTunNodeWrapper(con net.Conn, ctx *core.HandshakeContext) (*TunnelNodeWrapper, error) {
+	tunnelNode := proxy.NewTunnelNode(con, s.framer)
+	msgChannel := make(chan core.MessageData, 1000)
+	ip := con.RemoteAddr().String()
+	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, ctx.EncryptorKey, s.cfg)
+	if err != nil {
+		return nil, err
+	}
+	tunModuls := NewTunnelModules(enc)
+	tunNodeWrapper := NewTunnelNodeWrapper(tunnelNode, ip, msgChannel, ctx, tunModuls)
+	return tunNodeWrapper, nil
 }
 
 func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNodeWrapper, msgChannel chan core.MessageData) {

@@ -60,12 +60,13 @@ func (s *ServerTun) Start() error {
 }
 
 func (s *ServerTun) NewHandshakeContext() *core.HandshakeContext {
-	ctx := &core.HandshakeContext{}
+	ctx := &core.HandshakeContext{} // TODO добавить генерацию 32b ключа
 	clientIp, err := s.ipPool.Allocate()
 	if err != nil {
 		return nil
 	}
-
+	encKey := utils.Generate32ByteKey()
+	ctx.EncryptorKey = encKey
 	ctx.ClientIP = clientIp
 	return ctx
 }

@@ -46,12 +46,19 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 		t.logger.Warning("[ConnectToTunnel] :: connect remote addr -> " + err.Error())
 		return err
 	}
-	t.logger.Info("Try authenticate")
+	t.logger.Info("[ConnectToTunnel] :: Try authenticate")
 	if err := t.authenticate(conn); err != nil {
 		t.status.SetStopped()
 		return nil
 	}
-	t.logger.Debug("[ConnectToTunnel] auth success")
+	t.logger.Info("[ConnectToTunnel] :: Auth success")
+	t.logger.Info("[ConnectToTunnel] :: Start configure moduls from server data")
+	if err := t.configureModuls(); err != nil {
+		t.logger.Error("[ConnectToTunnel] :: Configure fail: " + err.Error())
+		t.status.SetStopped()
+		return nil
+	}
+	t.logger.Info("[ConnectToTunnel] :: Configure success")
 	t.status.SetRunning()
 	t.tunnelNode = proxy.NewTunnelNode(conn, t.framer)
 	go t.tunnelReader()
@@ -99,6 +106,15 @@ func (t *TunnelEngine) authenticate(conn net.Conn) error {
 		t.logger.Error("[authenticate] ClientHandshake error: " + err.Error())
 		return err
 	}
+	return nil
+}
+
+func (t *TunnelEngine) configureModuls() error {
+	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, []byte(t.ctx.EncryptorKey), t.cfg)
+	if err != nil {
+		return err
+	}
+	t.encryptor = enc
 	return nil
 }
 
