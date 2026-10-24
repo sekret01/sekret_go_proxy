@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [Unreleased]
+## [1.3.1] - 24.10.2026
 
 ### Changed
 - Ключ шифрования передается с сервера при Handshake
