@@ -94,13 +94,14 @@ func (t *TunnelEngine) SetStopped() {
 }
 
 func (t *TunnelEngine) authenticate(conn net.Conn) error {
-	_, key, err := t.bootstrap.ClientBootstrap(conn)
+	steps, key, err := t.bootstrap.ClientBootstrap(conn)
 	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
 	if err != nil {
 		t.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
 		return err
 	}
 	t.auth.SetEncryptor(enc)
+	t.auth.SetSteps(steps)
 	t.ctx, err = t.auth.ClientHandshake(conn)
 	if err != nil {
 		t.logger.Error("[authenticate] ClientHandshake error: " + err.Error())

@@ -144,7 +144,7 @@ func (s *ServerTunnelEngine) SetStopped() {
 }
 
 func (s *ServerTunnelEngine) authenticate(conn net.Conn) (*core.HandshakeContext, error) {
-	_, key, err := s.bootstrap.ServerBootstrap(conn)
+	steps, key, err := s.bootstrap.ServerBootstrap(conn)
 	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
 	if err != nil {
 		s.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
@@ -152,6 +152,7 @@ func (s *ServerTunnelEngine) authenticate(conn net.Conn) (*core.HandshakeContext
 		return nil, err
 	}
 	s.auth.SetEncryptor(enc)
+	s.auth.SetSteps(steps)
 	ctx, err := s.auth.ServerHandshake(conn)
 	if err != nil {
 		s.logger.Warning("[authenticate] Handshake error: " + err.Error())

@@ -44,8 +44,8 @@ func NewHandshake(cfg *config.Config, name string) (core.HandshakeStep, error) {
 	return factory(cfg)
 }
 
-func NewBootstrap(cfg config.Config) core.Bootstrap {
-	return bootstrap.NewBaseBootstrap()
+func NewBootstrap(cfg *config.Config) core.Bootstrap {
+	return bootstrap.NewBaseBootstrap(cfg)
 }
 
 func List() []string {
