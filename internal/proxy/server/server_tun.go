@@ -12,9 +12,9 @@ import (
 )
 
 type vpnSession struct {
-	node      *proxy.TunnelNode
-	clientIP  string
-	sessionID core.RequestID
+	nodeWrapper *TunnelNodeWrapper
+	clientIP    string
+	sessionID   core.RequestID
 }
 
 type ServerTun struct {
@@ -118,9 +118,9 @@ func (s *ServerTun) TunnelNodeHandler(tunWrapper *TunnelNodeWrapper) {
 
 func (s *ServerTun) HandleVpnConnect(tunWrapper *TunnelNodeWrapper, msg core.MessageData) {
 	session := &vpnSession{
-		node:      tunWrapper.Node(),
-		clientIP:  tunWrapper.HandshakeCtx().ClientIP,
-		sessionID: msg.RequestId,
+		nodeWrapper: tunWrapper,
+		clientIP:    tunWrapper.HandshakeCtx().ClientIP,
+		sessionID:   msg.RequestId,
 	}
 
 	s.mu.Lock()
@@ -168,7 +168,7 @@ func (s *ServerTun) tunReader() {
 		if !ex {
 			continue
 		}
-		s.tunnelEngine.sendIntoTunnel(core.GetNoopID(), core.MsgPacket, data, session.node)
+		s.tunnelEngine.sendIntoTunnel(core.GetNoopID(), core.MsgPacket, data, session.nodeWrapper)
 	}
 }
 

@@ -17,18 +17,38 @@ type TunnelNodeWrapper struct {
 	ip         string
 	msgChannel chan core.MessageData
 	ctx        *core.HandshakeContext
+	Moduls     *TunnelModules
 }
 
 func (t *TunnelNodeWrapper) Node() *proxy.TunnelNode              { return t.node }
 func (t *TunnelNodeWrapper) Ip() string                           { return t.ip }
 func (t *TunnelNodeWrapper) MsgChan() chan core.MessageData       { return t.msgChannel }
 func (t *TunnelNodeWrapper) HandshakeCtx() *core.HandshakeContext { return t.ctx }
-func NewTunnelNodeWrapper(node *proxy.TunnelNode, ip string, msgChannel chan core.MessageData, ctx *core.HandshakeContext) *TunnelNodeWrapper {
+func NewTunnelNodeWrapper(
+	node *proxy.TunnelNode,
+	ip string,
+	msgChannel chan core.MessageData,
+	ctx *core.HandshakeContext,
+	moduls *TunnelModules,
+) *TunnelNodeWrapper {
 	return &TunnelNodeWrapper{
 		node:       node,
 		ip:         ip,
 		msgChannel: msgChannel,
 		ctx:        ctx,
+		Moduls:     moduls,
+	}
+}
+
+type TunnelModules struct {
+	Encryptor core.Encryptor
+}
+
+func NewTunnelModules(
+	enc core.Encryptor,
+) *TunnelModules {
+	return &TunnelModules{
+		Encryptor: enc,
 	}
 }
 
@@ -162,40 +182,41 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 		tunnelNode := proxy.NewTunnelNode(con, s.framer)
 		msgChannel := make(chan core.MessageData, 1000)
 		ip := con.RemoteAddr().String()
-		tunNodeWrapper := NewTunnelNodeWrapper(tunnelNode, ip, msgChannel, ctx)
+		tunModuls := NewTunnelModules(s.encryptor) // TODO делать свой enc, генерить новый ключ
+		tunNodeWrapper := NewTunnelNodeWrapper(tunnelNode, ip, msgChannel, ctx, tunModuls)
 		s.connMutex.Lock()
 		s.tunnelNodesMap[ip] = tunNodeWrapper
 		s.connMutex.Unlock()
 		s.tunnelsChannel <- tunNodeWrapper
 		s.logger.Debug("[listenConnectoins] New connection: " + ip)
-		go s.tunnelReader(ip, tunnelNode, msgChannel)
+		go s.tunnelReader(ip, tunNodeWrapper, msgChannel)
 	}
 }
 
-func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNode *proxy.TunnelNode, msgChannel chan core.MessageData) {
+func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNodeWrapper, msgChannel chan core.MessageData) {
 	s.logger.Info("[tunnelReader] Start tunnel listening with " + ip)
 	for {
 		select {
-		case <-tunnelNode.Done():
+		case <-tunnelNodeWrapper.Node().Done():
 			s.logger.Info("[tunnelReader] Exit from read cycle")
 			s.connMutex.Lock()
 			delete(s.tunnelNodesMap, ip)
 			s.connMutex.Unlock()
 			return
-		case frame := <-tunnelNode.GetReadChan().GetChannel():
+		case frame := <-tunnelNodeWrapper.Node().GetReadChan().GetChannel():
 			data, msgType, requestId, err := s.framer.Unframe(frame)
 			if err != nil {
 				s.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
 				continue
 			}
-			decryptData := s.encryptor.Decrypt(data)
+			decryptData := tunnelNodeWrapper.Moduls.Encryptor.Decrypt(data)
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
 				Data:      decryptData,
 			}
 			select {
-			case <-tunnelNode.Done():
+			case <-tunnelNodeWrapper.Node().Done():
 			default:
 				msgChannel <- frameData
 			}
@@ -203,23 +224,23 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNode *proxy.TunnelNod
 	}
 }
 
-func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, tunNode *proxy.TunnelNode) error {
+func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, tunnelNodeWrapper *TunnelNodeWrapper) error {
 	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
-	payloadEncode := s.encryptor.Encrypt([]byte(payload))
+	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.Encrypt([]byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
-	tunNode.Send(frame)
+	tunnelNodeWrapper.Node().Send(frame)
 	return nil
 }
 
 // HELP
 
-func (s *ServerTunnelEngine) sendCloseIntoTunnel(requestId core.RequestID, tunNode *proxy.TunnelNode) {
+func (s *ServerTunnelEngine) sendCloseIntoTunnel(requestId core.RequestID, tunnelNodeWrapper *TunnelNodeWrapper) {
 	s.logger.Debug("[sendCloseIntoTunnel] close " + utils.RequestIdToString(requestId))
-	s.sendIntoTunnel(requestId, core.MsgClose, []byte{}, tunNode)
+	s.sendIntoTunnel(requestId, core.MsgClose, []byte{}, tunnelNodeWrapper)
 }
 
 func NewServerTunnelEngine(

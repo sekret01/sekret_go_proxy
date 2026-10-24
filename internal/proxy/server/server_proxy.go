@@ -76,7 +76,7 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 			case core.MsgPacket:
 				s.logger.Info("Packet get")
 			case core.MsgConnect:
-				s.connectAndRegistrate(msg.RequestId, msg.Data, tunWrapper.node)
+				s.connectAndRegistrate(msg.RequestId, msg.Data, &tunWrapper)
 			case core.MsgData:
 				s.putMessageIntoChannel(msg.RequestId, msg.Data)
 			case core.MsgClose:
@@ -105,18 +105,18 @@ func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeCh
 	return ch
 }
 
-func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData []byte, tunNode *proxy.TunnelNode) {
+func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData []byte, tunnelNodeWrapper *TunnelNodeWrapper) {
 	channel := s.getOrCreateChannel(requestId)
 	go func() {
 		targetCon, err := s.tunnelEngine.transport.Dial(string(decryptData))
 		if err != nil {
 			s.logger.Debug("[connectAndRegistrate] Can not connect to target server [" + utils.BytesToString(decryptData, 20) + "] " + err.Error())
 			s.closeChannel(requestId)
-			s.tunnelEngine.sendCloseIntoTunnel(requestId, tunNode) // TODO добавить сообщения ошибок
+			s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper) // TODO добавить сообщения ошибок
 			return
 		}
 		s.dispatcher.Register(requestId, targetCon, core.ProtoTest, true)
-		go s.targetConnectinoHandler(requestId, targetCon, tunNode)
+		go s.targetConnectinoHandler(requestId, targetCon, tunnelNodeWrapper)
 		go s.conChannelReader(requestId, channel, targetCon)
 	}()
 }
@@ -149,10 +149,10 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 	}
 }
 
-func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, tunNode *proxy.TunnelNode) {
+func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, tunnelNodeWrapper *TunnelNodeWrapper) {
 	s.logger.Debug("[targetConnectinoHandler] Create new connection: " + targetCon.RemoteAddr().String())
 	defer func() {
-		s.tunnelEngine.sendCloseIntoTunnel(requestId, tunNode)
+		s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper)
 		s.closeChannel(requestId)
 		proxy.CloseConnection(s.dispatcher, requestId)
 
@@ -161,7 +161,7 @@ func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCo
 	buf := make([]byte, 32*1024)
 	for {
 		select {
-		case <-tunNode.GetWriteChan().Done():
+		case <-tunnelNodeWrapper.Node().GetWriteChan().Done():
 			s.logger.Debug("[targetConnectinoHandler] Tunnel is closed, exit targetConnectinoHandler")
 			return
 		default:
@@ -176,7 +176,7 @@ func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCo
 				s.logger.Debug("[targetConnectinoHandler] Client disconnect with data size 0")
 				return
 			}
-			s.tunnelEngine.sendIntoTunnel(requestId, core.MsgData, buf[:size], tunNode)
+			s.tunnelEngine.sendIntoTunnel(requestId, core.MsgData, buf[:size], tunnelNodeWrapper)
 		}
 	}
 }
