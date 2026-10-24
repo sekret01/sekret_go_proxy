@@ -54,7 +54,6 @@ func NewTunnelModules(
 
 type ServerTunnelEngine struct {
 	transport      core.Transport
-	encryptor      core.Encryptor
 	framer         core.Framer
 	bootstrap      core.Bootstrap
 	auth           core.Auth
@@ -264,7 +263,6 @@ func (s *ServerTunnelEngine) sendCloseIntoTunnel(requestId core.RequestID, tunne
 
 func NewServerTunnelEngine(
 	transport core.Transport,
-	encryptor core.Encryptor,
 	framer core.Framer,
 	bootstrap core.Bootstrap,
 	auth core.Auth,
@@ -273,7 +271,6 @@ func NewServerTunnelEngine(
 ) *ServerTunnelEngine {
 	engine := &ServerTunnelEngine{
 		transport:      transport,
-		encryptor:      encryptor,
 		framer:         framer,
 		bootstrap:      bootstrap,
 		auth:           auth,

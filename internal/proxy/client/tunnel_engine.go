@@ -151,6 +151,11 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 // Чтение, обработка и перессылка данных с сервера
 func (t *TunnelEngine) tunnelReader() {
 	t.logger.Info("[tunnelReader] Start tunnel listening")
+	if t.encryptor == nil {
+		t.logger.Error("[tunnelReader] Encryptor is nil, exit from read cycle")
+		t.stopListening(true)
+		return
+	}
 	readChannel := t.tunnelNode.GetReadChan().GetChannel()
 
 	for {
@@ -181,7 +186,7 @@ func (t *TunnelEngine) tunnelReader() {
 }
 
 func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte) error {
-	if !t.status.IsRunning() {
+	if !t.status.IsRunning() || t.encryptor == nil {
 		return nil
 	}
 	t.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 100) + "]")
@@ -208,7 +213,6 @@ func (t *TunnelEngine) closeListeners() {
 
 func NewTunnelEngine(
 	transport core.Transport,
-	encryptor core.Encryptor,
 	framer core.Framer,
 	cfg *config.Config,
 	logger logger.Logger,
@@ -218,7 +222,7 @@ func NewTunnelEngine(
 	engine := &TunnelEngine{
 		tunnelNode:      nil,
 		transport:       transport,
-		encryptor:       encryptor,
+		encryptor:       nil,
 		framer:          framer,
 		status:          proxy.NewTunnelStatus(),
 		remoteAddr:      cfg.RemoteHost,
