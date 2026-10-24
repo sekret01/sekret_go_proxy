@@ -1,7 +1,6 @@
 package composite_handshake
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
@@ -51,11 +50,9 @@ func NewConpositeHandshakeAuth(
 	steps := make([]core.HandshakeStep, 0)
 	for _, name := range cfg.HandshakeSteps {
 		step, err := handshake.NewHandshake(cfg, name)
-		fmt.Println("process step: " + name)
 		if err != nil {
 			continue
 		}
-		fmt.Println("add step: " + name)
 		steps = append(steps, step)
 	}
 	return &CompositeHandshakeAuth{

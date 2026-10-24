@@ -6,7 +6,6 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
-	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -47,8 +46,6 @@ func (p *ServerTunApp) GetLogs() []logger.LogMessage {
 func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 	buildSuccess := true
 
-	encryptor, err := encryptors.NewEncryptor(cfg.EncryptorType, []byte(cfg.Key32Bytes), cfg) // TODO убрать []]byte(cfg.Key32Bytes)
-	buildSuccess = buildSuccess && isContinue(err)
 	transport, err := transports.NewTransport(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
 	framer, err := framers.NewFramer(cfg)
@@ -66,7 +63,6 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 
 	tunnelEngin := server.NewServerTunnelEngine(
 		transport,
-		encryptor,
 		framer,
 		bootstrap,
 		auth,

@@ -43,9 +43,12 @@ func (s *SecureConn) Write(b []byte) (n int, err error) {
 }
 
 func (s *SecureConn) Read(b []byte) (n int, err error) {
-	n, err = s.Conn.Read(b)
+	buf := make([]byte, len(b))
+	n, err = s.Conn.Read(buf)
 	if n > 0 {
-		copy(b, s.enc.Decrypt(b))
+		decrBytes := s.enc.Decrypt(buf[:n])
+		n = len(decrBytes)
+		copy(b, decrBytes)
 	}
 	return n, err
 }

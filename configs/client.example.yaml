@@ -8,14 +8,11 @@ modules:
   encryptor_type: default
   framer_type: default
   dispatcher_type: default
-  auth_type: default
-  handshake_steps: []
+  auth_type: composite_handshake
+  handshake_steps: [enckey]
 
 logs:
   log_level: INFO
-
-secure:
-  key_32_bytes: 
 
 admin:
   adminhost: 127.0.0.1:12345

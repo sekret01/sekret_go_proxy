@@ -14,5 +14,6 @@ type Bootstrap interface {
 }
 
 type HandshakeContext struct {
-	ClientIP string
+	ClientIP     string
+	EncryptorKey []byte
 }
