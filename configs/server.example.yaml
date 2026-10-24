@@ -14,9 +14,6 @@ modules:
 logs:
   log_level: INFO
 
-secure:
-  key_32_bytes: 
-
 admin:
   adminhost: 127.0.0.1:12345
   authentication: default

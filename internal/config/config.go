@@ -4,7 +4,6 @@ type Config struct {
 	ConnectionConfig `yaml:"connection"`
 	ModuleConfig     `yaml:"modules"`
 	LogConfig        `yaml:"logs"`
-	SecureConfig     `yaml:"secure"`
 	AdminConfig      `yaml:"admin"`
 	VPN              `yaml:"vpn"`
 }
@@ -26,10 +25,6 @@ type ModuleConfig struct {
 
 type LogConfig struct {
 	LoggerLevel string `yaml:"log_level"`
-}
-
-type SecureConfig struct {
-	Key32Bytes string `yaml:"key_32_bytes"`
 }
 
 type AdminConfig struct {
