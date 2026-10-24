@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [Unreleased]
+
+### Added
+- Список шагов Handshake отправляются от сервера к клиенту во время Bootstrap (перед Handshake)
+
+### Deleted
+- handshake_steps из конфига клиента
+
 ## [1.3.1] - 24.10.2026
 
 ### Changed
