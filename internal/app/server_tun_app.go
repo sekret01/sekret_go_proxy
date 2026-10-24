@@ -54,7 +54,7 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
 	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
-	bootstrap := handshake.NewBootstrap(*cfg)
+	bootstrap := handshake.NewBootstrap(cfg)
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")

@@ -55,7 +55,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
-	bootstrap := handshake.NewBootstrap(*cfg)
+	bootstrap := handshake.NewBootstrap(cfg)
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
