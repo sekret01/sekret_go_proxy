@@ -18,6 +18,7 @@ func (a *DefaultAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, er
 	return &core.HandshakeContext{}, nil
 }
 func (a *DefaultAuth) SetEncryptor(enc core.Encryptor) {}
+func (a *DefaultAuth) SetSteps(steps []string) error   { return nil }
 
 func NewDefaultAuthAuth(
 	cfg *config.Config,

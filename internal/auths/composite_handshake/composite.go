@@ -11,6 +11,7 @@ import (
 )
 
 type CompositeHandshakeAuth struct {
+	cfg          *config.Config
 	steps        []core.HandshakeStep
 	logger       logger.Logger
 	ctxGenerator core.HandshakeContextGenerator
@@ -43,20 +44,24 @@ func (a *CompositeHandshakeAuth) SetEncryptor(enc core.Encryptor) {
 	a.enc = enc
 }
 
+func (a *CompositeHandshakeAuth) SetSteps(steps []string) error {
+	for _, name := range steps {
+		step, err := handshake.NewHandshake(a.cfg, name)
+		if err != nil {
+			return core.ErrInvalidHandshakeStepKey
+		}
+		a.steps = append(a.steps, step)
+	}
+	return nil
+}
+
 func NewConpositeHandshakeAuth(
 	cfg *config.Config,
 	ctxGenerator core.HandshakeContextGenerator,
 ) (core.Auth, error) {
-	steps := make([]core.HandshakeStep, 0)
-	for _, name := range cfg.HandshakeSteps {
-		step, err := handshake.NewHandshake(cfg, name)
-		if err != nil {
-			continue
-		}
-		steps = append(steps, step)
-	}
 	return &CompositeHandshakeAuth{
-		steps:        steps,
+		steps:        []core.HandshakeStep{},
+		cfg:          cfg,
 		logger:       logger.GetLoggerHub().WithModule("CompositeHandshakeAuth"),
 		ctxGenerator: ctxGenerator,
 	}, nil
