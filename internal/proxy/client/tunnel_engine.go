@@ -95,6 +95,10 @@ func (t *TunnelEngine) SetStopped() {
 
 func (t *TunnelEngine) authenticate(conn net.Conn) error {
 	steps, key, err := t.bootstrap.ClientBootstrap(conn)
+	if err != nil {
+		t.logger.Warning("[authenticate] Bootstrap fail: " + err.Error())
+		return err
+	}
 	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
 	if err != nil {
 		t.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())

@@ -4,6 +4,7 @@
 
 ### Added
 - Список шагов Handshake отправляются от сервера к клиенту во время Bootstrap (перед Handshake)
+- MagicBytes для Bootstrap
 
 ### Deleted
 - handshake_steps из конфига клиента

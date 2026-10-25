@@ -145,6 +145,11 @@ func (s *ServerTunnelEngine) SetStopped() {
 
 func (s *ServerTunnelEngine) authenticate(conn net.Conn) (*core.HandshakeContext, error) {
 	steps, key, err := s.bootstrap.ServerBootstrap(conn)
+	if err != nil {
+		s.logger.Warning("[authenticate] Bootstrap fail: " + err.Error())
+		conn.Close()
+		return nil, err
+	}
 	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
 	if err != nil {
 		s.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
@@ -177,7 +182,7 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 		s.logger.Info("[listenConnectoins] Start auth [" + con.RemoteAddr().String() + "]")
 		ctx, err := s.authenticate(con)
 		if err != nil {
-			s.logger.Warning("[listenConnectoins] Auth [" + con.RemoteAddr().String() + "] fail :" + err.Error())
+			s.logger.Warning("[listenConnectoins] Auth [" + con.RemoteAddr().String() + "] fail: " + err.Error())
 			con.Close()
 			continue
 		}

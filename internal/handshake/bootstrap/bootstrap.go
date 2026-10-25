@@ -22,13 +22,17 @@ type HelloMsg struct {
 	Steps   []string
 }
 
-func getMsgSize() int {
-	return 100
-}
+// можно изменять / вынести отдельно для изменения (core.types)
+var bootstrapMagicBytes []byte = []byte{0x53, 0x24, 0x68, 0x12}
 
 func parseHelloMsg(data []byte) (HelloMsg, error) {
 	step := 0
-	payloadSize := binary.BigEndian.Uint32(data[0:4])
+	magicBytes := data[step : step+4]
+	if !compareBootstrapMagic(magicBytes) {
+		return HelloMsg{}, core.ErrInvalidMagic
+	}
+	step += 4
+	payloadSize := binary.BigEndian.Uint32(data[step : step+4])
 	step += 4
 	version := binary.BigEndian.Uint16(data[step : step+2])
 	step += 2
@@ -50,8 +54,9 @@ func parseHelloMsg(data []byte) (HelloMsg, error) {
 func helloMsgToBytes(msg HelloMsg) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	stepStringBytes := []byte(strings.Join(msg.Steps, ","))
-	payloadSize := uint32(2 + len(msg.Random) + len(msg.PubKey) + len(stepStringBytes))
+	payloadSize := uint32(len(bootstrapMagicBytes) + 2 + len(msg.Random) + len(msg.PubKey) + len(stepStringBytes))
 
+	buf.Write(bootstrapMagicBytes)
 	binary.Write(buf, binary.BigEndian, payloadSize)
 	binary.Write(buf, binary.BigEndian, msg.Version)
 	buf.Write(msg.Random[:])
@@ -59,6 +64,18 @@ func helloMsgToBytes(msg HelloMsg) ([]byte, error) {
 	buf.Write(stepStringBytes)
 
 	return buf.Bytes(), nil
+}
+
+func compareBootstrapMagic(magic []byte) bool {
+	if len(magic) != len(bootstrapMagicBytes) {
+		return false
+	}
+	for i := range len(bootstrapMagicBytes) {
+		if magic[i] != bootstrapMagicBytes[i] {
+			return false
+		}
+	}
+	return true
 }
 
 type BaseBootstrap struct {
@@ -119,28 +136,28 @@ func (b *BaseBootstrap) ServerBootstrap(con net.Conn) (steps []string, sessionKe
 	if err != nil {
 		return nil, nil, err
 	}
+	msg, err := parseHelloMsg(buf[:n])
+	if err != nil {
+		return nil, nil, err
+	}
 	curve := ecdh.X25519()
 	serverPrivateKey, _ := curve.GenerateKey(rand.Reader)
 	serverPublicKey := serverPrivateKey.PublicKey()
 	serverRandom := make([]byte, 32)
 	_, _ = io.ReadFull(rand.Reader, serverRandom)
-	msg := HelloMsg{
+	recMsg := HelloMsg{
 		Version: 1,
 		Random:  [32]byte(serverRandom),
 		PubKey:  [32]byte(serverPublicKey.Bytes()),
 		Steps:   b.cfg.HandshakeSteps,
 	}
-	bytesData, err := helloMsgToBytes(msg)
+	bytesData, err := helloMsgToBytes(recMsg)
 	if err != nil {
 		return nil, nil, err
 	}
 	con.Write(bytesData)
 
 	// keys
-	msg, err = parseHelloMsg(buf[:n])
-	if err != nil {
-		return nil, nil, err
-	}
 	clientPubKey, err := curve.NewPublicKey(msg.PubKey[:])
 	if err != nil {
 		return nil, nil, err
