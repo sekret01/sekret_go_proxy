@@ -45,6 +45,7 @@ func (a *CompositeHandshakeAuth) SetEncryptor(enc core.Encryptor) {
 }
 
 func (a *CompositeHandshakeAuth) SetSteps(steps []string) error {
+	a.steps = []core.HandshakeStep{}
 	for _, name := range steps {
 		step, err := handshake.NewHandshake(a.cfg, name)
 		if err != nil {
