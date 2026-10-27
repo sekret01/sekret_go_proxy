@@ -16,10 +16,20 @@ type ConnectionConfig struct {
 }
 
 type FilterConfig struct {
-	FilterActive    bool     `yaml:"active"`
-	FilterType      string   `yaml:"filter_type"`
-	FilterAddresses []string `yaml:"addresses"`
-	FilterDomain    string   `yaml:"domain"`
+	FilterActive    bool               `yaml:"active"`
+	FilterType      string             `yaml:"filter_type"`
+	FilterAddresses []string           `yaml:"addresses"`
+	FilterDomain    string             `yaml:"domain"`
+	FilterServer    FilterServerConfig `yaml:"server"`
+}
+
+type FilterServerConfig struct {
+	Host       string `yaml:"host"`
+	Transport  string `yaml:"transport"`
+	Framer     string `yaml:"framer"`
+	Encryptor  string `yaml:"encryptor"`
+	Dispatcher string `yaml:"dispatcher"`
+	Auth       string `yaml:"auth"`
 }
 
 type ModuleConfig struct {

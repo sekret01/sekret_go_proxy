@@ -8,6 +8,13 @@ filter:
   filter_type: default
   addresses: []
   domain: ru
+  server:
+    host: 127.0.0.1:35785
+    transport: tcp
+    framer: default
+    encryptor: default
+    dispatcher: default
+    auth: default
 
 modules:
   transport_type: tcp
