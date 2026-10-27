@@ -55,9 +55,12 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
 	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
+	filterAuth, err := auths.NewAuth(cfg, ctxGenConnector)
+	buildSuccess = buildSuccess && isContinue(err)
 	filter, err := filters.NewFilter(cfg)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
+	filterBootstrap := handshake.NewBootstrap(cfg)
 	bootstrap := handshake.NewBootstrap(cfg)
 
 	if !buildSuccess {
@@ -73,9 +76,18 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		auth,
 		bootstrap,
 	)
+	filterTunnelEngin := client.NewTunnelEngine(
+		transport,
+		framer,
+		cfg,
+		logger.GetLoggerHub().WithModule("TunnelEngine [Filter]"),
+		filterAuth,
+		filterBootstrap,
+	)
 
 	tunnel := client.NewClientProxy(
 		tunnelEngin,
+		filterTunnelEngin,
 		filter,
 		detector,
 		dispatcher,

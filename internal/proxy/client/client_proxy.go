@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -33,13 +35,15 @@ func (c *ClientProxy) GetStatus() *proxy.TunnelStatus {
 
 // Запуск соединения между клиентом и удаленным узлом
 func (c *ClientProxy) Start() error {
-	if err := c.startMainTunnel(); err != nil {
-		return err
-	}
-	if err := c.startFilterTunnel(); err != nil {
-		c.logger.Error("[Start]: Start filter tunnelEngine error: " + err.Error())
-	}
-	return nil
+	// if err := c.startMainTunnel(); err != nil {
+	// 	return err
+	// }
+	// if err := c.startFilterTunnel(); err != nil {
+	// 	c.logger.Error("[Start]: Start filter tunnelEngine error: " + err.Error())
+	// }
+	go c.startFilterTunnel()
+	return c.startMainTunnel()
+	// return nil
 	// TODO-DEL
 	// if c.mainTunnelEngine.IsRunning() {
 	// 	c.logger.Warning("[Start] Trying to start running service, return")
@@ -102,7 +106,10 @@ func (c *ClientProxy) startFilterTunnel() error {
 		if err != nil {
 			return err
 		}
-		c.listenTunnelMessages(c.filterTunnelEngine)
+		go c.listenTunnelMessages(c.filterTunnelEngine)
+		for c.filterTunnelEngine.IsRunning() {
+			time.Sleep(100 * time.Millisecond) // TODO костыль, заменить на Done()
+		}
 	}
 	return nil
 }
@@ -225,10 +232,11 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 	method := parsedHeaderFirstString[0]
 	target := parsedHeaderFirstString[1]
 
-	// TODO ADD FILTER
-	filter := c.filter.Check(target)
-
 	if method == "CONNECT" {
+		filter := c.filter.Check(target)
+		fmt.Println("Get target: " + target)
+		fmt.Println("is filter")
+		fmt.Println(filter)
 		requestConn.Write([]byte(core.HttpConnectResponse))
 		c.handleTunnelConnect(requestConn, target, filter)
 		return
@@ -236,6 +244,7 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 		requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
 		prepTarget := strings.Replace(target, "http://", "", 1)
 		prepTarget = prepTarget[:len(prepTarget)-1] + ":80"
+		filter := c.filter.Check(prepTarget)
 		// TODO-DEL c.mainTunnelEngine.sendIntoTunnel(requestId, core.MsgConnect, []byte(prepTarget))
 		c.distributeTunnelAndSend(requestId, core.MsgConnect, []byte(prepTarget), filter)
 
@@ -291,11 +300,11 @@ func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, reques
 func (c *ClientProxy) listenTunnelMessages(tunnelEngine *TunnelEngine) {
 	for msg := range tunnelEngine.tunnelMessages {
 		conWrapper, ok := c.dispatcher.Find(msg.RequestId)
-		requestCon := conWrapper.Conn
 		if !ok {
 			c.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
 			continue
 		}
+		requestCon := conWrapper.Conn
 		c.logger.Debug("[tunnelReader] Get data [ " + utils.RequestIdToString(msg.RequestId) + " ], msg_type: " + utils.MessageTypeToHexString(msg.MsgType))
 		switch msg.MsgType {
 		case core.MsgData:
@@ -332,24 +341,29 @@ func (c *ClientProxy) generateAndRegistrateId(requestConn net.Conn, protoType co
 }
 
 func (c *ClientProxy) distributeTunnelAndSend(requestId core.RequestID, msgType core.MessageType, payload []byte, filter bool) error {
+	return c.mainTunnelEngine.sendIntoTunnel(requestId, msgType, payload) // TODO-TEST
 	if !filter {
 		return c.mainTunnelEngine.sendIntoTunnel(requestId, msgType, payload)
 	}
-	if !c.filterTunnelEngine.GetStatus().IsRunning() {
-		return c.mainTunnelEngine.sendIntoTunnel(requestId, msgType, payload)
-	}
+	// if !c.filterTunnelEngine.GetStatus().IsRunning() {
+	// 	return c.mainTunnelEngine.sendIntoTunnel(requestId, msgType, payload)
+	// }
 	return c.filterTunnelEngine.sendIntoTunnel(requestId, msgType, payload)
 }
 
 func (c *ClientProxy) distributeTunnelAndSendClose(requestId core.RequestID, filter bool) {
+	c.mainTunnelEngine.sendCloseIntoTunnel(requestId)
+	return // TODO-TEST
 	if filter {
 		c.filterTunnelEngine.sendCloseIntoTunnel(requestId)
+	} else {
+		c.mainTunnelEngine.sendCloseIntoTunnel(requestId)
 	}
-	c.mainTunnelEngine.sendCloseIntoTunnel(requestId)
 }
 
 func NewClientProxy(
 	mainTunnelEngine *TunnelEngine,
+	filterTunnelEngine *TunnelEngine,
 	filter core.Filter,
 	detector core.Detector,
 	dispatcher core.Dispatcher,
@@ -357,13 +371,14 @@ func NewClientProxy(
 	logger logger.Logger,
 ) *ClientProxy {
 	client := &ClientProxy{
-		mainTunnelEngine: mainTunnelEngine,
-		filter:           filter,
-		detector:         detector,
-		dispatcher:       dispatcher,
-		localAddr:        cfg.LocalHost,
-		logger:           logger,
-		listener:         nil,
+		mainTunnelEngine:   mainTunnelEngine,
+		filterTunnelEngine: filterTunnelEngine,
+		filter:             filter,
+		detector:           detector,
+		dispatcher:         dispatcher,
+		localAddr:          cfg.LocalHost,
+		logger:             logger,
+		listener:           nil,
 	}
 	mainTunnelEngine.RegistrateListener(client)
 	return client
