@@ -1,7 +1,6 @@
 package defaultencryptorgo
 
 import (
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 )
@@ -17,7 +16,7 @@ func (m *DefaultEncryptor) Decrypt(data []byte) []byte {
 	return data
 }
 
-func NewDefaultEncryptor(key []byte, config *config.Config) (core.Encryptor, error) {
+func NewDefaultEncryptor(key []byte) (core.Encryptor, error) {
 	return &DefaultEncryptor{}, nil
 }
 

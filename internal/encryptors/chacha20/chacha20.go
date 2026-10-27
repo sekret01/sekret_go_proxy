@@ -8,7 +8,6 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 )
@@ -42,7 +41,7 @@ func (c *ChaCha20Encryptor) Decrypt(ciphertext []byte) []byte {
 	return plaintext
 }
 
-func NewChaCha20(key []byte, cfg *config.Config) (core.Encryptor, error) {
+func NewChaCha20(key []byte) (core.Encryptor, error) {
 	if len(key) != chacha20poly1305.KeySize {
 		return nil, errors.New("key must be 32 bytes for ChaCha20-Poly1305")
 	}
