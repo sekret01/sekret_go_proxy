@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
@@ -43,8 +42,8 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewTransport(cfg *config.Config) (core.Transport, error) {
-	factory, err := get(cfg.TransportType)
+func NewTransport(name string) (core.Transport, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}
