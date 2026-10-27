@@ -3,7 +3,6 @@ package defaultframer
 import (
 	"encoding/binary"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 )
@@ -88,7 +87,7 @@ func (f *DefaultFramer) GetPayloadSize(data []byte) (int, error) {
 	return int(dataSize), nil
 }
 
-func NewDefaultFramer(cfg *config.Config) (core.Framer, error) {
+func NewDefaultFramer() (core.Framer, error) {
 	return &DefaultFramer{}, nil
 }
 
