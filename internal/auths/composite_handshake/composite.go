@@ -4,14 +4,12 @@ import (
 	"net"
 
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type CompositeHandshakeAuth struct {
-	cfg          *config.Config
 	steps        []core.HandshakeStep
 	logger       logger.Logger
 	ctxGenerator core.HandshakeContextGenerator
@@ -47,7 +45,7 @@ func (a *CompositeHandshakeAuth) SetEncryptor(enc core.Encryptor) {
 func (a *CompositeHandshakeAuth) SetSteps(steps []string) error {
 	a.steps = []core.HandshakeStep{}
 	for _, name := range steps {
-		step, err := handshake.NewHandshake(a.cfg, name)
+		step, err := handshake.NewHandshake(name)
 		if err != nil {
 			return core.ErrInvalidHandshakeStepKey
 		}
@@ -57,12 +55,10 @@ func (a *CompositeHandshakeAuth) SetSteps(steps []string) error {
 }
 
 func NewConpositeHandshakeAuth(
-	cfg *config.Config,
 	ctxGenerator core.HandshakeContextGenerator,
 ) (core.Auth, error) {
 	return &CompositeHandshakeAuth{
 		steps:        []core.HandshakeStep{},
-		cfg:          cfg,
 		logger:       logger.GetLoggerHub().WithModule("CompositeHandshakeAuth"),
 		ctxGenerator: ctxGenerator,
 	}, nil
