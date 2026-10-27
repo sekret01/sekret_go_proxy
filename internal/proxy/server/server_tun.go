@@ -4,7 +4,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -217,14 +216,14 @@ func NewServerTun(
 	tunnelEngine *ServerTunnelEngine,
 	packetDevice core.PacketDevice,
 	logger logger.Logger,
-	cfg *config.Config,
+	subnet string,
 ) *ServerTun {
 	return &ServerTun{
 		tunnelEngine: tunnelEngine,
 		packetDevice: packetDevice,
 		logger:       logger,
 
-		ipPool:        NewIPPool(cfg.VPN.Subnet),
+		ipPool:        NewIPPool(subnet),
 		ipToSession:   make(map[string]*vpnSession),
 		nodeToSession: make(map[*proxy.TunnelNode]*vpnSession),
 		done:          make(chan struct{}),

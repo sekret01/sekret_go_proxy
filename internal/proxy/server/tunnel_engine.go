@@ -4,7 +4,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -61,13 +60,13 @@ type ServerTunnelEngine struct {
 	tunnelsChannel chan *TunnelNodeWrapper
 
 	localAddr    string
+	encType      string
 	mainListener net.Listener
 	connMutex    sync.Mutex
 	chanMutex    sync.RWMutex
 
 	logger logger.Logger
 	status *proxy.TunnelStatus
-	cfg    *config.Config
 }
 
 func (s *ServerTunnelEngine) RunTunnel() error {
@@ -150,7 +149,7 @@ func (s *ServerTunnelEngine) authenticate(conn net.Conn) (*core.HandshakeContext
 		conn.Close()
 		return nil, err
 	}
-	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
+	enc, err := encryptors.NewEncryptor(s.encType, key)
 	if err != nil {
 		s.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
 		conn.Close()
@@ -208,7 +207,7 @@ func (s *ServerTunnelEngine) configureTunNodeWrapper(con net.Conn, ctx *core.Han
 	tunnelNode := proxy.NewTunnelNode(con, s.framer)
 	msgChannel := make(chan core.MessageData, 1000)
 	ip := con.RemoteAddr().String()
-	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, ctx.EncryptorKey, s.cfg)
+	enc, err := encryptors.NewEncryptor(s.encType, ctx.EncryptorKey)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +271,8 @@ func NewServerTunnelEngine(
 	framer core.Framer,
 	bootstrap core.Bootstrap,
 	auth core.Auth,
-	cfg *config.Config,
+	localAddr string,
+	encType string,
 	logger logger.Logger,
 ) *ServerTunnelEngine {
 	engine := &ServerTunnelEngine{
@@ -282,11 +282,10 @@ func NewServerTunnelEngine(
 		auth:           auth,
 		tunnelNodesMap: make(map[string]*TunnelNodeWrapper, 100),
 		tunnelsChannel: make(chan *TunnelNodeWrapper, 100),
-		localAddr:      cfg.LocalHost,
+		localAddr:      localAddr,
 		mainListener:   nil,
 		logger:         logger,
 		status:         proxy.NewTunnelStatus(),
-		cfg:            cfg,
 	}
 	return engine
 }
