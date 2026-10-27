@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -27,6 +26,7 @@ type TunnelEngine struct {
 	bootstrap  core.Bootstrap
 
 	remoteAddr string // Адрес удаленного узла для подключения
+	encType    string
 
 	logger          logger.Logger
 	mutex           sync.Mutex
@@ -35,7 +35,6 @@ type TunnelEngine struct {
 
 	status *proxy.TunnelStatus // Состояние работы
 	ctx    *core.HandshakeContext
-	cfg    *config.Config
 }
 
 func (t *TunnelEngine) ConnectToTunnel() error {
@@ -99,7 +98,7 @@ func (t *TunnelEngine) authenticate(conn net.Conn) error {
 		t.logger.Warning("[authenticate] Bootstrap fail: " + err.Error())
 		return err
 	}
-	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
+	enc, err := encryptors.NewEncryptor(t.encType, key)
 	if err != nil {
 		t.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
 		return err
@@ -115,7 +114,7 @@ func (t *TunnelEngine) authenticate(conn net.Conn) error {
 }
 
 func (t *TunnelEngine) configureModuls() error {
-	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, []byte(t.ctx.EncryptorKey), t.cfg)
+	enc, err := encryptors.NewEncryptor(t.encType, []byte(t.ctx.EncryptorKey))
 	if err != nil {
 		return err
 	}
@@ -219,10 +218,11 @@ func (t *TunnelEngine) closeListeners() {
 func NewTunnelEngine(
 	transport core.Transport,
 	framer core.Framer,
-	cfg *config.Config,
 	logger logger.Logger,
 	auth core.Auth,
 	bootstrap core.Bootstrap,
+	remoteAddr string,
+	encType string,
 ) *TunnelEngine {
 	engine := &TunnelEngine{
 		tunnelNode:      nil,
@@ -230,13 +230,13 @@ func NewTunnelEngine(
 		encryptor:       nil,
 		framer:          framer,
 		status:          proxy.NewTunnelStatus(),
-		remoteAddr:      cfg.RemoteHost,
+		remoteAddr:      remoteAddr,
+		encType:         encType,
 		logger:          logger,
 		clientListeners: make([]ClientListener, 0),
 		tunnelMessages:  make(chan core.MessageData, 1000),
 		auth:            auth,
 		bootstrap:       bootstrap,
-		cfg:             cfg,
 	}
 	return engine
 }

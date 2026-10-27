@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -367,7 +366,7 @@ func NewClientProxy(
 	filter core.Filter,
 	detector core.Detector,
 	dispatcher core.Dispatcher,
-	cfg *config.Config,
+	localAddr string,
 	logger logger.Logger,
 ) *ClientProxy {
 	client := &ClientProxy{
@@ -376,7 +375,7 @@ func NewClientProxy(
 		filter:             filter,
 		detector:           detector,
 		dispatcher:         dispatcher,
-		localAddr:          cfg.LocalHost,
+		localAddr:          localAddr,
 		logger:             logger,
 		listener:           nil,
 	}
