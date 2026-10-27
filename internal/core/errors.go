@@ -11,6 +11,7 @@ var (
 	ErrInvalidFramerKey        = errors.New("Framer with key not found")
 	ErrInvalidDispatcherKey    = errors.New("Dispatcher with key not found")
 	ErrInvalidAuthKey          = errors.New("Auth module with key not found")
+	ErrInvalidFilterKey        = errors.New("Filter with key not found")
 	ErrInvalidHandshakeStepKey = errors.New("HandshakeStep module with key not found")
 	ErrOsTypeNotSupported      = errors.New("packetDevice for os is not supported")
 
