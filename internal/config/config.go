@@ -2,6 +2,7 @@ package config
 
 type Config struct {
 	ConnectionConfig `yaml:"connection"`
+	FilterConfig     `yaml:"filter"`
 	ModuleConfig     `yaml:"modules"`
 	LogConfig        `yaml:"logs"`
 	AdminConfig      `yaml:"admin"`
@@ -12,6 +13,13 @@ type ConnectionConfig struct {
 	ConnectionType string `yaml:"connection_type"`
 	LocalHost      string `yaml:"localhost"`
 	RemoteHost     string `yaml:"remotehost"`
+}
+
+type FilterConfig struct {
+	FilterActive    bool     `yaml:"active"`
+	FilterType      string   `yaml:"filter_type"`
+	FilterAddresses []string `yaml:"addresses"`
+	FilterDomain    string   `yaml:"domain"`
 }
 
 type ModuleConfig struct {

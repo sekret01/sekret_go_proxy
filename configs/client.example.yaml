@@ -3,6 +3,12 @@ connection:
   localhost: 127.0.0.1:15985
   remotehost: 
 
+filter:
+  active: true
+  filter_type: default
+  addresses: []
+  domain: ru
+
 modules:
   transport_type: tcp
   encryptor_type: default
