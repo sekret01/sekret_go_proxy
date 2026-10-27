@@ -3,7 +3,6 @@ package default_filter
 import (
 	"testing"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/filters"
 )
 
@@ -191,14 +190,12 @@ func TestDefaultFilter_EmptyHost(t *testing.T) {
 }
 
 func TestDefaultFilter_Registration(t *testing.T) {
-	created, err := filters.NewFilter(&config.Config{
-		FilterConfig: config.FilterConfig{
-			FilterActive:    true,
-			FilterType:      "default",
-			FilterAddresses: []string{"google.com"},
-			FilterDomain:    "ru",
-		},
-	})
+	created, err := filters.NewFilter(
+		"default",
+		true,
+		"ru",
+		[]string{"google.com"},
+	)
 	if err != nil {
 		t.Fatalf("filters.Create(\"default\", ...) returned error: %v", err)
 	}

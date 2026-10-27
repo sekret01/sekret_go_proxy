@@ -3,7 +3,6 @@ package filters
 import (
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
@@ -33,12 +32,12 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewFilter(cfg *config.Config) (core.Filter, error) {
-	factory, err := get(cfg.FilterType)
+func NewFilter(name string, active bool, domain string, address []string) (core.Filter, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}
-	return factory(cfg.FilterActive, cfg.FilterDomain, cfg.FilterAddresses)
+	return factory(active, domain, address)
 }
 
 func List() []string {
