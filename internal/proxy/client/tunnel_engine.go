@@ -144,7 +144,9 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 		t.status.SetStopped()
 	}
 	t.sendCloseIntoTunnel(core.GetNoopID()) // TODO генерировать 1 раз вначале, хранить в структуре
-	t.tunnelNode.Stop()
+	if t.tunnelNode != nil {
+		t.tunnelNode.Stop()
+	}
 	t.closeListeners()
 	close(t.tunnelMessages)                              // TODO нужно ли
 	t.tunnelMessages = make(chan core.MessageData, 1000) // TODO нужно ли

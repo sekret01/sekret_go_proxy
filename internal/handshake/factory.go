@@ -29,7 +29,7 @@ func get(key string) (FactoryFunc, error) {
 	defer mu.RUnlock()
 	val, exist := framesMap[key]
 	if !exist {
-		return nil, core.ErrInvalidTransportKey
+		return nil, core.ErrInvalidHandshakeStepKey
 	}
 	return val, nil
 }

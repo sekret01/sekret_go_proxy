@@ -33,7 +33,7 @@ func get(key string) (FactoryFunc, error) {
 	defer mu.RUnlock()
 	val, exist := bootsrapMap[key]
 	if !exist {
-		return nil, core.ErrInvalidTransportKey
+		return nil, core.ErrInvalidBootstrapKey
 	}
 	return val, nil
 }

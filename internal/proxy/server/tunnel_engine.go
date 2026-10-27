@@ -283,6 +283,7 @@ func NewServerTunnelEngine(
 		tunnelNodesMap: make(map[string]*TunnelNodeWrapper, 100),
 		tunnelsChannel: make(chan *TunnelNodeWrapper, 100),
 		localAddr:      localAddr,
+		encType:        encType,
 		mainListener:   nil,
 		logger:         logger,
 		status:         proxy.NewTunnelStatus(),

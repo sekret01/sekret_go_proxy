@@ -13,6 +13,7 @@ var (
 	ErrInvalidAuthKey          = errors.New("Auth module with key not found")
 	ErrInvalidFilterKey        = errors.New("Filter with key not found")
 	ErrInvalidHandshakeStepKey = errors.New("HandshakeStep module with key not found")
+	ErrInvalidBootstrapKey     = errors.New("Bootstrap module with key not found")
 	ErrOsTypeNotSupported      = errors.New("packetDevice for os is not supported")
 
 	ErrBuildClientApp = errors.New("Error building ClientApp modules")

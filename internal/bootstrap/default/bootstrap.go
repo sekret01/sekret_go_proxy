@@ -178,8 +178,12 @@ func (b *BaseBootstrap) ServerBootstrap(con net.Conn) (steps []string, sessionKe
 
 }
 
-func NewBaseBootstrap(cfg *bootstrap.BootstrapConfig) core.Bootstrap {
+func NewBaseBootstrap(cfg *bootstrap.BootstrapConfig) (core.Bootstrap, error) {
 	return &BaseBootstrap{
 		cfg: cfg,
-	}
+	}, nil
+}
+
+func init() {
+	bootstrap.Registrate("default", NewBaseBootstrap)
 }
