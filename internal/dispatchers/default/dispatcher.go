@@ -4,7 +4,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -48,7 +47,7 @@ func (d *DefaultDispatcher) Delete(id core.RequestID) {
 }
 
 // Создает единственный диспетчер
-func NewDefaultDispatcher(cfg *config.Config) (core.Dispatcher, error) {
+func NewDefaultDispatcher() (core.Dispatcher, error) {
 	return &DefaultDispatcher{
 		connections: map[core.RequestID]core.ConnWrapper{},
 		logger:      logger.GetLoggerHub().WithModule("Dispatcher"),
