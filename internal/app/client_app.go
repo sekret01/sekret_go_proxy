@@ -6,6 +6,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/detectors"
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
+	"github.com/sekret01/sekret_go_proxy/internal/filters"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -54,6 +55,8 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
 	auth, err := auths.NewAuth(cfg, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
+	filter, err := filters.NewFilter(cfg)
+	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
 	bootstrap := handshake.NewBootstrap(cfg)
 
@@ -73,6 +76,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 
 	tunnel := client.NewClientProxy(
 		tunnelEngin,
+		filter,
 		detector,
 		dispatcher,
 		cfg,
