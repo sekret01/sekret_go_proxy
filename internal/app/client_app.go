@@ -2,13 +2,13 @@ package app
 
 import (
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
+	"github.com/sekret01/sekret_go_proxy/internal/bootstrap"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/detectors"
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/filters"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
-	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/client"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
@@ -46,22 +46,24 @@ func (p *ClientApp) GetLogs() []logger.LogMessage {
 func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess := true
 
-	transport, err := transports.NewTransport(cfg)
+	transport, err := transports.NewTransport(cfg.TransportType)
 	buildSuccess = buildSuccess && isContinue(err)
-	framer, err := framers.NewFramer(cfg)
+	framer, err := framers.NewFramer(cfg.FramerType)
 	buildSuccess = buildSuccess && isContinue(err)
-	dispatcher, err := dispatchers.NewDispatcher(cfg)
+	dispatcher, err := dispatchers.NewDispatcher(cfg.DispatcherType)
 	buildSuccess = buildSuccess && isContinue(err)
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
-	auth, err := auths.NewAuth(cfg, ctxGenConnector)
+	auth, err := auths.NewAuth(cfg.AuthType, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
-	filterAuth, err := auths.NewAuth(cfg, ctxGenConnector)
+	filterAuth, err := auths.NewAuth(cfg.AuthType, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
-	filter, err := filters.NewFilter(cfg)
+	filter, err := filters.NewFilter(cfg.FilterType, cfg.FilterActive, cfg.FilterDomain, cfg.FilterAddresses)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
-	filterBootstrap := handshake.NewBootstrap(cfg)
-	bootstrap := handshake.NewBootstrap(cfg)
+	filterBootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: cfg.HandshakeSteps})
+	buildSuccess = buildSuccess && isContinue(err)
+	mainBootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: cfg.HandshakeSteps})
+	buildSuccess = buildSuccess && isContinue(err)
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
@@ -71,18 +73,20 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	tunnelEngin := client.NewTunnelEngine(
 		transport,
 		framer,
-		cfg,
 		logger.GetLoggerHub().WithModule("TunnelEngine"),
 		auth,
-		bootstrap,
+		mainBootstrap,
+		cfg.RemoteHost,
+		cfg.EncryptorType,
 	)
 	filterTunnelEngin := client.NewTunnelEngine(
 		transport,
 		framer,
-		cfg,
 		logger.GetLoggerHub().WithModule("TunnelEngine [Filter]"),
 		filterAuth,
 		filterBootstrap,
+		"127.0.0.1:35785",
+		"default",
 	)
 
 	tunnel := client.NewClientProxy(
@@ -91,7 +95,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		filter,
 		detector,
 		dispatcher,
-		cfg,
+		cfg.LocalHost,
 		logger.GetLoggerHub().WithModule("ClientProxy"),
 	)
 	ctxGenConnector.SubscribeGenerator(tunnel)

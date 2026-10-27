@@ -2,12 +2,12 @@ package app
 
 import (
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
+	"github.com/sekret01/sekret_go_proxy/internal/bootstrap"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/detectors"
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
-	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/server"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
@@ -45,17 +45,17 @@ func (p *ServerApp) GetLogs() []logger.LogMessage {
 func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 	buildSuccess := true
 
-	transport, err := transports.NewTransport(cfg)
+	transport, err := transports.NewTransport(cfg.TransportType)
 	buildSuccess = buildSuccess && isContinue(err)
-	framer, err := framers.NewFramer(cfg)
+	framer, err := framers.NewFramer(cfg.FramerType)
 	buildSuccess = buildSuccess && isContinue(err)
-	dispatcher, err := dispatchers.NewDispatcher(cfg)
+	dispatcher, err := dispatchers.NewDispatcher(cfg.DispatcherType)
 	buildSuccess = buildSuccess && isContinue(err)
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
-	auth, err := auths.NewAuth(cfg, ctxGenConnector)
+	auth, err := auths.NewAuth(cfg.AuthType, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
-	bootstrap := handshake.NewBootstrap(cfg)
+	bootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: cfg.HandshakeSteps})
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
@@ -67,7 +67,8 @@ func NewServerApp(cfg *config.Config) (*ServerApp, error) {
 		framer,
 		bootstrap,
 		auth,
-		cfg,
+		cfg.LocalHost,
+		cfg.EncryptorType,
 		logger.GetLoggerHub().WithModule("ServerTunnelEngine"),
 	)
 

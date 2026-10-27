@@ -4,10 +4,10 @@ import (
 	"runtime"
 
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
+	"github.com/sekret01/sekret_go_proxy/internal/bootstrap"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
-	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/packets"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/server"
@@ -46,15 +46,15 @@ func (p *ServerTunApp) GetLogs() []logger.LogMessage {
 func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 	buildSuccess := true
 
-	transport, err := transports.NewTransport(cfg)
+	transport, err := transports.NewTransport(cfg.TransportType)
 	buildSuccess = buildSuccess && isContinue(err)
-	framer, err := framers.NewFramer(cfg)
+	framer, err := framers.NewFramer(cfg.FramerType)
 	buildSuccess = buildSuccess && isContinue(err)
 	buildSuccess = buildSuccess && isContinue(err)
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
-	auth, err := auths.NewAuth(cfg, ctxGenConnector)
+	auth, err := auths.NewAuth(cfg.AuthType, ctxGenConnector)
 	buildSuccess = buildSuccess && isContinue(err)
-	bootstrap := handshake.NewBootstrap(cfg)
+	bootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: cfg.HandshakeSteps})
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
@@ -66,7 +66,8 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 		framer,
 		bootstrap,
 		auth,
-		cfg,
+		cfg.LocalHost,
+		cfg.EncryptorType,
 		logger.GetLoggerHub().WithModule("ServerTunnelEngine"),
 	)
 
@@ -80,7 +81,7 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 		tunnelEngin,
 		packetDevice,
 		logger.GetLoggerHub().WithModule("ServerTun"),
-		cfg,
+		cfg.VPN.Subnet,
 	)
 	ctxGenConnector.SubscribeGenerator(tunnel)
 	return &ServerTunApp{
