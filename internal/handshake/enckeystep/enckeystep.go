@@ -5,7 +5,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -52,7 +51,7 @@ func (s *EncKeyStep) Name() string {
 	return name
 }
 
-func NewEncKeyStep(cfg *config.Config) (core.HandshakeStep, error) {
+func NewEncKeyStep(cfg *handshake.HandshakeStepConfig) (core.HandshakeStep, error) {
 	return &EncKeyStep{}, nil
 }
 

@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
-	"github.com/sekret01/sekret_go_proxy/internal/handshake/bootstrap"
 )
 
-type FactoryFunc func(*config.Config) (core.HandshakeStep, error)
+type FactoryFunc func(*HandshakeStepConfig) (core.HandshakeStep, error)
+type HandshakeStepConfig struct{}
 
 var (
 	framesMap = make(map[string]FactoryFunc)
@@ -36,7 +35,7 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewHandshake(cfg *config.Config, name string) (core.HandshakeStep, error) {
+func NewHandshake(name string, cfg *HandshakeStepConfig) (core.HandshakeStep, error) {
 	factory, err := get(name)
 	if err != nil {
 		return nil, err
@@ -44,8 +43,8 @@ func NewHandshake(cfg *config.Config, name string) (core.HandshakeStep, error) {
 	return factory(cfg)
 }
 
-func NewBootstrap(cfg *config.Config) core.Bootstrap {
-	return bootstrap.NewBaseBootstrap(cfg)
+func NewHandshakeStepConfig() *HandshakeStepConfig {
+	return &HandshakeStepConfig{}
 }
 
 func List() []string {

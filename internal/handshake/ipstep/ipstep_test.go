@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 )
 
 func runHandshake(
@@ -50,7 +50,7 @@ func TestIpStep_Name(t *testing.T) {
 }
 
 func TestNewIpStep(t *testing.T) {
-	step, err := NewIpStep(&config.Config{})
+	step, err := NewIpStep(&handshake.HandshakeStepConfig{})
 	if err != nil {
 		t.Fatalf("NewIpStep returned error: %v", err)
 	}

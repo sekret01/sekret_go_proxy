@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 )
 
 func runHandshake(
@@ -50,7 +50,7 @@ func TestEncKeyStep_Name(t *testing.T) {
 }
 
 func TestNewEncKeyStep(t *testing.T) {
-	step, err := NewEncKeyStep(&config.Config{})
+	step, err := NewEncKeyStep(&handshake.HandshakeStepConfig{})
 	if err != nil {
 		t.Fatalf("NewEncKeyStep returned error: %v", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 )
@@ -47,7 +46,7 @@ func (s *IpStep) Name() string {
 	return "ip"
 }
 
-func NewIpStep(cfg *config.Config) (core.HandshakeStep, error) {
+func NewIpStep(cfg *handshake.HandshakeStepConfig) (core.HandshakeStep, error) {
 	return &IpStep{},
 		nil
 }
