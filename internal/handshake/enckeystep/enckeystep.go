@@ -51,7 +51,7 @@ func (s *EncKeyStep) Name() string {
 	return name
 }
 
-func NewEncKeyStep(cfg *handshake.HandshakeStepConfig) (core.HandshakeStep, error) {
+func NewEncKeyStep() (core.HandshakeStep, error) {
 	return &EncKeyStep{}, nil
 }
 

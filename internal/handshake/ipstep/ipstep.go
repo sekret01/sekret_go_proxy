@@ -46,7 +46,7 @@ func (s *IpStep) Name() string {
 	return "ip"
 }
 
-func NewIpStep(cfg *handshake.HandshakeStepConfig) (core.HandshakeStep, error) {
+func NewIpStep() (core.HandshakeStep, error) {
 	return &IpStep{},
 		nil
 }

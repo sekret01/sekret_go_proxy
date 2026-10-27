@@ -7,8 +7,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-type FactoryFunc func(*HandshakeStepConfig) (core.HandshakeStep, error)
-type HandshakeStepConfig struct{}
+type FactoryFunc func() (core.HandshakeStep, error)
 
 var (
 	framesMap = make(map[string]FactoryFunc)
@@ -35,16 +34,12 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewHandshake(name string, cfg *HandshakeStepConfig) (core.HandshakeStep, error) {
+func NewHandshake(name string) (core.HandshakeStep, error) {
 	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}
-	return factory(cfg)
-}
-
-func NewHandshakeStepConfig() *HandshakeStepConfig {
-	return &HandshakeStepConfig{}
+	return factory()
 }
 
 func List() []string {
