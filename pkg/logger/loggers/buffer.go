@@ -15,6 +15,8 @@ type BufferLogger struct {
 }
 
 func (l *BufferLogger) Log(lvl logger.LoggerLevel, msg string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if len(l.buffer) > 1 && l.buffer[len(l.buffer)-1].Message == msg {
 		l.buffer[len(l.buffer)-1].Count++
 		return
@@ -26,8 +28,6 @@ func (l *BufferLogger) Log(lvl logger.LoggerLevel, msg string) {
 		Message: msg,
 		Count:   1,
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.buffer = append(l.buffer, newLog)
 	l.validateLen()
 }

@@ -6,7 +6,7 @@ type Hub struct {
 	loggers []Logger
 	buffer  LogBuffer
 	level   LoggerLevel
-	mu      sync.Mutex
+	mu      sync.RWMutex
 }
 
 func (h *Hub) Registrate(logger Logger) {
@@ -40,10 +40,13 @@ func (h *Hub) WithModule(module string) Logger {
 }
 
 func (h *Hub) Log(lvl LoggerLevel, msg string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if lvl >= h.level {
-		for _, logger := range h.loggers {
+	h.mu.RLock()
+	curLvl := h.level
+	loggersCopy := make([]Logger, len(h.loggers))
+	copy(loggersCopy, h.loggers)
+	h.mu.RUnlock()
+	if lvl >= curLvl {
+		for _, logger := range loggersCopy {
 			logger.Log(lvl, msg)
 		}
 	}

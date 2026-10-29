@@ -29,15 +29,16 @@ func (l *FileLogger) Error(msg string)    { l.Log(logger.ERROR, msg) }
 func (l *FileLogger) Critical(msg string) { l.Log(logger.CRITICAL, msg) }
 
 func (l *FileLogger) ChanenelReader() {
-	for log := range l.logChan {
-		file, err := os.OpenFile("logs/logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return
-		}
+	file, err := os.OpenFile("logs/logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	canLog := err == nil
+	if canLog {
 		defer file.Close()
-
-		if _, err := file.WriteString(log); err != nil {
-			continue
+	}
+	for log := range l.logChan {
+		if canLog {
+			if _, err := file.WriteString(log); err != nil {
+				continue
+			}
 		}
 	}
 }
