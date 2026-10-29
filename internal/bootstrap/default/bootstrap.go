@@ -25,22 +25,37 @@ type HelloMsg struct {
 // можно изменять / вынести отдельно для изменения (core.types)
 var bootstrapMagicBytes []byte = []byte{0x53, 0x24, 0x68, 0x12}
 
-func parseHelloMsg(data []byte) (HelloMsg, error) {
-	step := 0
-	magicBytes := data[step : step+4]
-	if !compareBootstrapMagic(magicBytes) {
-		return HelloMsg{}, core.ErrInvalidMagic
+const (
+	magicBytesLength  = 4
+	payloadSizeLength = 4
+	versionSize       = 2
+	randomSize        = 32
+	pubKeySize        = 32
+)
+
+func parseHelloMsgHeader(data []byte) (int, error) {
+	if len(data) < magicBytesLength+payloadSizeLength {
+		return -1, core.ErrInsufficientHeaderLensth
 	}
-	step += 4
-	payloadSize := binary.BigEndian.Uint32(data[step : step+4])
-	step += 4
-	version := binary.BigEndian.Uint16(data[step : step+2])
-	step += 2
-	random := data[step : step+32]
-	step += 32
-	pubkey := data[step : step+32]
-	step += 32
-	stepStringBytes := data[step : payloadSize+4]
+	step := 0
+	magicBytes := data[step : step+magicBytesLength]
+	if !compareBootstrapMagic(magicBytes) {
+		return -1, core.ErrInvalidMagic
+	}
+	step += magicBytesLength
+	payloadSize := binary.BigEndian.Uint32(data[step : step+payloadSizeLength])
+	return int(payloadSize), nil
+}
+
+func parseHelloMsgPayload(data []byte) (HelloMsg, error) {
+	step := 0
+	version := binary.BigEndian.Uint16(data[step : step+versionSize])
+	step += versionSize
+	random := data[step : step+randomSize]
+	step += randomSize
+	pubkey := data[step : step+pubKeySize]
+	step += pubKeySize
+	stepStringBytes := data[step:]
 	steps := strings.Split(string(stepStringBytes), ",")
 	msg := HelloMsg{
 		Version: version,
@@ -54,7 +69,7 @@ func parseHelloMsg(data []byte) (HelloMsg, error) {
 func helloMsgToBytes(msg HelloMsg) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	stepStringBytes := []byte(strings.Join(msg.Steps, ","))
-	payloadSize := uint32(len(bootstrapMagicBytes) + 2 + len(msg.Random) + len(msg.PubKey) + len(stepStringBytes))
+	payloadSize := uint32(versionSize + len(msg.Random) + len(msg.PubKey) + len(stepStringBytes))
 
 	buf.Write(bootstrapMagicBytes)
 	binary.Write(buf, binary.BigEndian, payloadSize)
@@ -89,25 +104,20 @@ func (b *BaseBootstrap) ClientBootstrap(con net.Conn) (steps []string, sessionKe
 	clientRandom := make([]byte, 32)
 	_, _ = io.ReadFull(rand.Reader, clientRandom)
 
-	msg := HelloMsg{
+	recMsg := HelloMsg{
 		Version: 1,
 		Random:  [32]byte(clientRandom),
 		PubKey:  [32]byte(clientPublicKey.Bytes()),
 		Steps:   []string{},
 	}
-	bytesData, err := helloMsgToBytes(msg)
+	bytesData, err := helloMsgToBytes(recMsg)
 	if err != nil {
 		return nil, nil, err
 	}
 	con.Write(bytesData)
 
 	// keys
-	buf := make([]byte, 100)
-	n, err := con.Read(buf)
-	if err != nil {
-		return nil, nil, err
-	}
-	msg, err = parseHelloMsg(buf[:n])
+	msg, err := b.readBootstrapMsg(con)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -131,12 +141,7 @@ func (b *BaseBootstrap) ClientBootstrap(con net.Conn) (steps []string, sessionKe
 
 }
 func (b *BaseBootstrap) ServerBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error) {
-	buf := make([]byte, 100)
-	n, err := con.Read(buf)
-	if err != nil {
-		return nil, nil, err
-	}
-	msg, err := parseHelloMsg(buf[:n])
+	msg, err := b.readBootstrapMsg(con)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -175,7 +180,30 @@ func (b *BaseBootstrap) ServerBootstrap(con net.Conn) (steps []string, sessionKe
 		return nil, nil, err
 	}
 	return b.cfg.HandshakeSteps, serverWriteKey, nil
+}
 
+func (b *BaseBootstrap) readBootstrapMsg(con net.Conn) (*HelloMsg, error) {
+	headerBuf := make([]byte, magicBytesLength+payloadSizeLength)
+	if _, err := io.ReadFull(con, headerBuf); err != nil {
+		return nil, err
+	}
+	payloadSize, err := parseHelloMsgHeader(headerBuf)
+	if err != nil {
+		return nil, err
+	}
+	if payloadSizeLength < 0 || payloadSize > core.MAX_PAYLOAD_SIZE {
+		return nil, core.ErrPayloadSizeTooLarge
+	}
+
+	payloadBuf := make([]byte, payloadSize)
+	if _, err = io.ReadFull(con, payloadBuf); err != nil {
+		return nil, err
+	}
+	msg, err := parseHelloMsgPayload(payloadBuf)
+	if err != nil {
+		return nil, err
+	}
+	return &msg, nil
 }
 
 func NewBaseBootstrap(cfg *bootstrap.BootstrapConfig) (core.Bootstrap, error) {

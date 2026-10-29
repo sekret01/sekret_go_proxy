@@ -1,6 +1,9 @@
 package core
 
 import (
+	"bytes"
+	"encoding/binary"
+	"io"
 	"net"
 )
 
@@ -33,24 +36,33 @@ type SecureConn struct {
 	enc Encryptor
 }
 
-func (s *SecureConn) Write(b []byte) (n int, err error) {
+func (s *SecureConn) Write(b []byte) (int, error) {
+	buf := new(bytes.Buffer)
 	data := make([]byte, len(b))
 	data = s.enc.Encrypt(b)
-	if _, err := s.Conn.Write(data); err != nil {
+	payloadLen := uint16(len(data))
+	binary.Write(buf, binary.BigEndian, payloadLen)
+	buf.Write(data)
+	if _, err := s.Conn.Write(buf.Bytes()); err != nil {
 		return 0, err
 	}
 	return len(b), nil
 }
 
-func (s *SecureConn) Read(b []byte) (n int, err error) {
-	buf := make([]byte, len(b))
-	n, err = s.Conn.Read(buf)
-	if n > 0 {
-		decrBytes := s.enc.Decrypt(buf[:n])
-		n = len(decrBytes)
-		copy(b, decrBytes)
+func (s *SecureConn) Read(b []byte) (int, error) {
+	sizeBuf := make([]byte, 2)
+	if _, err := io.ReadFull(s.Conn, sizeBuf); err != nil {
+		return -1, err
 	}
-	return n, err
+	payloadSize := binary.BigEndian.Uint16(sizeBuf)
+	dataBuf := make([]byte, payloadSize)
+	if _, err := io.ReadFull(s.Conn, dataBuf); err != nil {
+		return -1, err
+	}
+	decrBytes := s.enc.Decrypt(dataBuf)
+	n := len(decrBytes)
+	copy(b, decrBytes)
+	return n, nil
 }
 
 func NewSecureConn(
