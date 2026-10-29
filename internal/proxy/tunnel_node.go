@@ -104,6 +104,9 @@ func (t *TunnelNode) tunnelWriter() {
 		case <-t.done:
 			t.logger.Debug("[tunnelWriter] Tunnel is close, exit")
 			return
+		case <-t.tunnelReadChan.done:
+			t.logger.Debug("[tunnelWriter] Read cheannel is close, exit")
+			return
 		case frame := <-t.tunnelWriteChan.GetChannel():
 			t.connMut.Lock()
 			if t.remoteTunnelNode == nil {
@@ -115,7 +118,8 @@ func (t *TunnelNode) tunnelWriter() {
 			t.connMut.Unlock()
 			if err != nil {
 				t.logger.Error("[tunnelWriter] Error in send data: " + err.Error())
-				continue
+				t.Stop()
+				return
 			}
 			t.logger.Debug("[tunnelChanReader] Data has been sent")
 		}

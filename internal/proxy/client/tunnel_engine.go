@@ -48,14 +48,14 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 	t.logger.Info("[ConnectToTunnel] :: Try authenticate")
 	if err := t.authenticate(conn); err != nil {
 		t.status.SetStopped()
-		return nil
+		return err
 	}
 	t.logger.Info("[ConnectToTunnel] :: Auth success")
 	t.logger.Info("[ConnectToTunnel] :: Start configure moduls from server data")
 	if err := t.configureModuls(); err != nil {
 		t.logger.Error("[ConnectToTunnel] :: Configure fail: " + err.Error())
 		t.status.SetStopped()
-		return nil
+		return err
 	}
 	t.logger.Info("[ConnectToTunnel] :: Configure success")
 	t.status.SetRunning()

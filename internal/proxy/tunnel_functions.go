@@ -105,10 +105,9 @@ func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]b
 
 func CloseConnection(dispatcher core.Dispatcher, requestId core.RequestID) {
 	conWrapper, ok := dispatcher.Find(requestId)
-	con := conWrapper.Conn
 	if !ok {
 		return
 	}
-	con.Close()
+	conWrapper.Conn.Close()
 	dispatcher.Delete(requestId)
 }
