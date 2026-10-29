@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"sync"
 )
 
 // Интерфейс создателя HandshakeContext
@@ -20,13 +21,21 @@ type HandshakeGeneratorSubscriber interface {
 // Прослойка-реализация генератора и слушателя генератора
 type HandshakeGeneratorConnector struct {
 	generator HandshakeContextGenerator
+	mu        sync.RWMutex
 }
 
 func (c *HandshakeGeneratorConnector) SubscribeGenerator(generator HandshakeContextGenerator) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.generator = generator
 }
 
 func (c *HandshakeGeneratorConnector) NewHandshakeContext() *HandshakeContext {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.generator == nil {
+		return nil
+	}
 	return c.generator.NewHandshakeContext()
 }
 

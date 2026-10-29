@@ -18,6 +18,9 @@ type CompositeHandshakeAuth struct {
 
 func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
+	if ctx == nil {
+		return ctx, core.ErrEncorrectHandshakeContext
+	}
 	secureConn := core.NewSecureConn(conn, a.enc)
 	for _, step := range a.steps {
 		if err := step.ServerSide(ctx, secureConn); err != nil {
@@ -29,6 +32,9 @@ func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.Handshake
 
 func (a *CompositeHandshakeAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
+	if ctx == nil {
+		return ctx, core.ErrEncorrectHandshakeContext
+	}
 	secureConn := core.NewSecureConn(conn, a.enc)
 	for _, step := range a.steps {
 		if err := step.ClientSide(ctx, secureConn); err != nil {

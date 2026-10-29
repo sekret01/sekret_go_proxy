@@ -25,7 +25,8 @@ var (
 
 	ErrAythFailed = errors.New("Authentication failed")
 
-	ErrAppNotRunning = errors.New("App is not running now")
+	ErrAppNotRunning             = errors.New("App is not running now")
+	ErrEncorrectHandshakeContext = errors.New("Handshake context is nil or empty. but must not to be")
 
 	ErrTunnelClosed = errors.New("Tunnel is closed")
 )
