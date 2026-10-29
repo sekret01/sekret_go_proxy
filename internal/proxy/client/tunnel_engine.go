@@ -35,9 +35,15 @@ type TunnelEngine struct {
 
 	status *proxy.TunnelStatus // Состояние работы
 	ctx    *core.HandshakeContext
+	done   chan struct{}
+}
+
+func (t *TunnelEngine) Done() chan struct{} {
+	return t.done
 }
 
 func (t *TunnelEngine) ConnectToTunnel() error {
+	t.done = make(chan struct{})
 	t.status.SetLaunch()
 	conn, err := t.waitConnectionToTunnel()
 	if err != nil {
@@ -143,13 +149,12 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 	if stopRunning {
 		t.status.SetStopped()
 	}
+	close(t.done)
 	t.sendCloseIntoTunnel(core.GetNoopID()) // TODO генерировать 1 раз вначале, хранить в структуре
 	if t.tunnelNode != nil {
 		t.tunnelNode.Stop()
 	}
 	t.closeListeners()
-	close(t.tunnelMessages)                              // TODO нужно ли
-	t.tunnelMessages = make(chan core.MessageData, 1000) // TODO нужно ли
 	t.logger.Info("[stopListening] Stop tunnel listening")
 	return nil
 }
@@ -239,6 +244,7 @@ func NewTunnelEngine(
 		tunnelMessages:  make(chan core.MessageData, 1000),
 		auth:            auth,
 		bootstrap:       bootstrap,
+		done:            make(chan struct{}),
 	}
 	return engine
 }

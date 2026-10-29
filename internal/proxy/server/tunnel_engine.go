@@ -67,10 +67,13 @@ type ServerTunnelEngine struct {
 
 	logger logger.Logger
 	status *proxy.TunnelStatus
+	done   chan struct{}
 }
 
 func (s *ServerTunnelEngine) RunTunnel() error {
 	s.status.SetLaunch()
+	s.tunnelsChannel = make(chan *TunnelNodeWrapper, 100)
+	s.done = make(chan struct{})
 	listener, err := s.transport.Listen(s.localAddr)
 	s.logger.Info("Start listen on " + s.localAddr)
 	if err != nil {
@@ -89,6 +92,8 @@ func (s *ServerTunnelEngine) StopListening() error {
 		return nil
 	}
 	s.status.SetStopped()
+	close(s.done)
+	close(s.tunnelsChannel)
 	s.connMutex.Lock()
 	for soket, tunNode := range s.tunnelNodesMap {
 		tunNode.Node().Stop()
@@ -197,10 +202,23 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 		s.connMutex.Lock()
 		s.tunnelNodesMap[tunNodeWrapper.ip] = tunNodeWrapper
 		s.connMutex.Unlock()
-		s.tunnelsChannel <- tunNodeWrapper
+		if ok := s.putTunnelInChannel(tunNodeWrapper); !ok {
+			s.logger.Debug("[listenConnectoins] Cannot put connection in chan, skip: " + tunNodeWrapper.ip)
+			continue
+		}
 		s.logger.Debug("[listenConnectoins] New connection: " + tunNodeWrapper.ip)
 		go s.tunnelReader(tunNodeWrapper.ip, tunNodeWrapper, tunNodeWrapper.msgChannel)
 	}
+}
+
+func (s *ServerTunnelEngine) putTunnelInChannel(tunNodeWrapper *TunnelNodeWrapper) bool {
+	select {
+	case <-s.done:
+		return false
+	case s.tunnelsChannel <- tunNodeWrapper:
+		return true
+	}
+
 }
 
 func (s *ServerTunnelEngine) configureTunNodeWrapper(con net.Conn, ctx *core.HandshakeContext) (*TunnelNodeWrapper, error) {
@@ -287,6 +305,7 @@ func NewServerTunnelEngine(
 		mainListener:   nil,
 		logger:         logger,
 		status:         proxy.NewTunnelStatus(),
+		done:           nil,
 	}
 	return engine
 }

@@ -197,6 +197,11 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 	c.logger.Debug("[handlerHttpProto] get header: \n" + strings.Trim(string(headerFirstString), " \n"))
 
 	parsedHeaderFirstString := strings.Fields(headerFirstString)
+	if len(parsedHeaderFirstString) < 2 {
+		c.logger.Debug("[handlerHttpProto] Error: header has not method or target: " + headerFirstString)
+		requestConn.Close()
+		return
+	}
 	method := parsedHeaderFirstString[0]
 	target := parsedHeaderFirstString[1]
 
@@ -256,37 +261,43 @@ func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, reques
 }
 
 func (c *ClientProxy) listenTunnelMessages(tunnelEngine *TunnelEngine) {
-	for msg := range tunnelEngine.tunnelMessages {
-		conWrapper, ok := c.dispatcher.Find(msg.RequestId)
-		if !ok {
-			c.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
-			continue
-		}
-		requestCon := conWrapper.Conn
-		c.logger.Debug("[tunnelReader] Get data [ " + utils.RequestIdToString(msg.RequestId) + " ], msg_type: " + utils.MessageTypeToHexString(msg.MsgType))
-		switch msg.MsgType {
-		case core.MsgData:
-			n := 10
-			if len(msg.Data) < n {
-				n = len(msg.Data)
+	for {
+		select {
+		case <-tunnelEngine.Done():
+			c.logger.Info("[listenTunnelMessages] get Done from tunnel, exit listen")
+			return
+		case msg := <-tunnelEngine.tunnelMessages:
+			conWrapper, ok := c.dispatcher.Find(msg.RequestId)
+			if !ok {
+				c.logger.Debug("[listenTunnelMessages] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+				continue
 			}
-			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(msg.Data, 20) + "...]")
-			requestCon.Write(msg.Data)
-			if !conWrapper.IsTunnel {
-				dataStr := string(msg.Data)
-				if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
-					strings.Contains(dataStr, "Connection: close") {
-					c.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(msg.RequestId) + "]")
-					tunnelEngine.sendCloseIntoTunnel(msg.RequestId)
-					proxy.CloseConnection(c.dispatcher, msg.RequestId)
+			requestCon := conWrapper.Conn
+			c.logger.Debug("[listenTunnelMessages] Get data [ " + utils.RequestIdToString(msg.RequestId) + " ], msg_type: " + utils.MessageTypeToHexString(msg.MsgType))
+			switch msg.MsgType {
+			case core.MsgData:
+				n := 10
+				if len(msg.Data) < n {
+					n = len(msg.Data)
 				}
+				c.logger.Debug("[listenTunnelMessages] send data [" + utils.BytesToString(msg.Data, 20) + "...]")
+				requestCon.Write(msg.Data)
+				if !conWrapper.IsTunnel {
+					dataStr := string(msg.Data)
+					if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
+						strings.Contains(dataStr, "Connection: close") {
+						c.logger.Debug("[listenTunnelMessages] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+						tunnelEngine.sendCloseIntoTunnel(msg.RequestId)
+						proxy.CloseConnection(c.dispatcher, msg.RequestId)
+					}
 
+				}
+			case core.MsgClose:
+				proxy.CloseConnection(c.dispatcher, msg.RequestId)
+			case core.MsgError:
+				requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+				proxy.CloseConnection(c.dispatcher, msg.RequestId)
 			}
-		case core.MsgClose:
-			proxy.CloseConnection(c.dispatcher, msg.RequestId)
-		case core.MsgError:
-			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			proxy.CloseConnection(c.dispatcher, msg.RequestId)
 		}
 	}
 }
