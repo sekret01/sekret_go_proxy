@@ -112,7 +112,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		filterServer, err = NewFilterServerApp(&cfg.FilterServer)
 		if err != nil {
 			logger.GetLoggerHub().Error("Errors in building filterServer, continue without it")
-			return nil, core.ErrBuildClientApp
+			cfg.FilterActive = false
 		}
 	}
 	ctxGenConnector.SubscribeGenerator(tunnel)
