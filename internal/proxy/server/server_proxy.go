@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -167,6 +168,7 @@ func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCo
 			s.logger.Debug("[targetConnectinoHandler] Tunnel is closed, exit targetConnectinoHandler")
 			return
 		default:
+			targetCon.SetDeadline(time.Now().Add(10 * time.Second))
 			size, err := targetCon.Read(buf)
 			if err != nil {
 				if !(errors.Is(err, net.ErrClosed) || err == io.EOF) {

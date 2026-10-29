@@ -25,7 +25,7 @@ type ServerTun struct {
 	ipToSession   map[string]*vpnSession
 	nodeToSession map[*proxy.TunnelNode]*vpnSession
 	mu            sync.Mutex
-	once          sync.Once
+	once          *sync.Once
 
 	done chan struct{}
 }
@@ -35,6 +35,8 @@ func (s *ServerTun) Start() error {
 		s.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
+	s.done = make(chan struct{})
+	s.once = &sync.Once{} // TODO-CHECK надо ли
 	s.tunnelEngine.SetLaunch()
 	s.packetDevice.ServerClose()
 	if err := s.packetDevice.CreateTun("tun0"); err != nil {
