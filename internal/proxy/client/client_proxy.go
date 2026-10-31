@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	clientDns "github.com/sekret01/sekret_go_proxy/internal/dns"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -25,6 +26,7 @@ type ClientProxy struct {
 	localAddr          string // Адрес текущего узла
 	logger             logger.Logger
 	listener           net.Listener // Слушатель внешних поключений
+	ipMAp              *clientDns.IPDomainMap
 }
 
 func (c *ClientProxy) GetStatus() *proxy.TunnelStatus {
@@ -88,10 +90,10 @@ func (c *ClientProxy) Stop() error {
 		c.logger.Error("[Stop] Stop listening mainTunnelEngine error: " + res.Error())
 		totalErr = res
 	}
-	if res := c.filterTunnelEngine.stopListening(true); res != nil {
-		c.logger.Error("[Stop] Stop listening filterTunnelEngine error: " + res.Error())
-		totalErr = res
-	}
+	// if res := c.filterTunnelEngine.stopListening(true); res != nil {
+	// 	c.logger.Error("[Stop] Stop listening filterTunnelEngine error: " + res.Error())
+	// 	totalErr = res
+	// }
 	c.CloseListen()
 	return totalErr
 }
@@ -206,9 +208,32 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 	target := parsedHeaderFirstString[1]
 
 	if method == "CONNECT" {
-		filter := c.filter.Check(target)
+		host, _, err := net.SplitHostPort(target)
+		if err != nil {
+			c.logger.Debug("[handlerHttpProto]: Target str " + host + " not ip")
+			host = target
+		}
+		filter := false
+
+		if ip := net.ParseIP(host); ip != nil {
+			if c.ipMAp == nil {
+				c.logger.Debug("[handlerHttpProto]: No ipMap to get " + host)
+			} else if domain, ok := c.ipMAp.Get(host); ok {
+				c.logger.Debug("[handlerHttpProto]: Check target " + host + " like ip (ipMap)")
+				c.logger.Debug("[handlerHttpProto]: IP " + host + " found in ipMap")
+				if c.filter.Check(domain) {
+					filter = true
+				}
+			} else {
+				c.logger.Debug("[handlerHttpProto]: IP " + host + "fnot ound in ipMap")
+			}
+		} else {
+			c.logger.Debug("[handlerHttpProto]: Check target " + host + " like domain")
+			filter = c.filter.Check(host)
+		}
+
 		requestConn.Write([]byte(core.HttpConnectResponse))
-		c.handleTunnelConnect(requestConn, target, filter)
+		c.handleTunnelConnect(requestConn, host, filter) // TODO-DEL target <- host
 		return
 	} else {
 		requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
@@ -332,6 +357,7 @@ func NewClientProxy(
 	dispatcher core.Dispatcher,
 	localAddr string,
 	logger logger.Logger,
+	ipMAp *clientDns.IPDomainMap,
 ) *ClientProxy {
 	client := &ClientProxy{
 		mainTunnelEngine:   mainTunnelEngine,
@@ -342,6 +368,7 @@ func NewClientProxy(
 		localAddr:          localAddr,
 		logger:             logger,
 		listener:           nil,
+		ipMAp:              ipMAp,
 	}
 	mainTunnelEngine.RegistrateListener(client)
 	return client

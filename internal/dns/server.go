@@ -1,7 +1,6 @@
 package dns
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -52,7 +51,6 @@ func (s *DNSServer) Start() error {
 	s.server = &dns.Server{Addr: s.addr, Net: "udp"}
 	dns.HandleFunc(".", s.handleDNSRequest)
 
-	log.Printf("[DNS] Starting DNS server on %s, upstream: %s", s.addr, s.upstream)
 	return s.server.ListenAndServe()
 }
 
@@ -68,7 +66,6 @@ func (s *DNSServer) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 
 	resp, _, err := client.Exchange(r, s.upstream)
 	if err != nil {
-		log.Printf("[DNS] Error querying upstream: %v", err)
 		dns.HandleFailed(w, r)
 		return
 	}
@@ -83,7 +80,6 @@ func (s *DNSServer) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 			if aRecord, ok := ans.(*dns.A); ok {
 				ip := aRecord.A.String()
 				s.ipMap.Set(ip, domain)
-				log.Printf("[DNS] Mapped IP %s -> %s", ip, domain)
 			}
 		}
 	}

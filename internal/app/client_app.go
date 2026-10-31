@@ -7,6 +7,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/detectors"
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
+	"github.com/sekret01/sekret_go_proxy/internal/dns"
 	"github.com/sekret01/sekret_go_proxy/internal/filters"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -19,6 +20,7 @@ import (
 type ClientApp struct {
 	tunnel       *client.ClientProxy
 	filterServer *server.ServerProxy
+	dnsServer    *dns.DNSServer
 }
 
 func (p *ClientApp) Start() error {
@@ -31,6 +33,9 @@ func (p *ClientApp) Start() error {
 func (p *ClientApp) Stop() error {
 	if p.filterServer != nil {
 		p.filterServer.Stop()
+	}
+	if p.dnsServer != nil {
+		p.dnsServer.Stop()
 	}
 	return p.tunnel.Stop()
 }
@@ -72,10 +77,25 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess = buildSuccess && isContinue(err)
 	mainBootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: cfg.HandshakeSteps})
 	buildSuccess = buildSuccess && isContinue(err)
+	ipMap := dns.NewIPDomainMap()
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildClientApp
+	}
+
+	var dnsServer *dns.DNSServer = nil
+	if cfg.DnsActive {
+		dnsServer = dns.NewDNSServer(
+			cfg.DnsHost,
+			cfg.DnsUpstream,
+			ipMap)
+		go func() {
+			err := dnsServer.Start()
+			if err != nil {
+				logger.GetLoggerHub().Warning("DNS server error, continue without it: " + err.Error())
+			}
+		}()
 	}
 
 	tunnelEngin := client.NewTunnelEngine(
@@ -105,6 +125,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		dispatcher,
 		cfg.LocalHost,
 		logger.GetLoggerHub().WithModule("ClientProxy"),
+		ipMap,
 	)
 
 	var filterServer *server.ServerProxy = nil
@@ -119,6 +140,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	return &ClientApp{
 		tunnel:       tunnel,
 		filterServer: filterServer,
+		dnsServer:    dnsServer,
 	}, nil
 }
 

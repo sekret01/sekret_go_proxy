@@ -7,6 +7,7 @@ type Config struct {
 	LogConfig        `yaml:"logs"`
 	AdminConfig      `yaml:"admin"`
 	VPN              `yaml:"vpn"`
+	DnsConfig        `yaml:"dns"`
 }
 
 type ConnectionConfig struct {
@@ -30,6 +31,12 @@ type FilterServerConfig struct {
 	Encryptor  string `yaml:"encryptor"`
 	Dispatcher string `yaml:"dispatcher"`
 	Auth       string `yaml:"auth"`
+}
+
+type DnsConfig struct {
+	DnsActive   bool   `yaml:"active"`
+	DnsHost     string `yaml:"host"`
+	DnsUpstream string `yaml:"upstream"`
 }
 
 type ModuleConfig struct {

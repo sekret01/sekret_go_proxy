@@ -146,6 +146,7 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 		t.logger.Warning("[stopListening] Trying to stop stopped service, cencel")
 		return nil
 	}
+	t.logger.Debug("[stopListening] STOP LISTENING ACTIVATE")
 	if stopRunning {
 		t.status.SetStopped()
 	}
