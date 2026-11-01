@@ -233,7 +233,7 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 		}
 
 		requestConn.Write([]byte(core.HttpConnectResponse))
-		c.handleTunnelConnect(requestConn, host, filter) // TODO-DEL target <- host
+		c.handleTunnelConnect(requestConn, target, filter) // TODO-DEL target <- host
 		return
 	} else {
 		requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
