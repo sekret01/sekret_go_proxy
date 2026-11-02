@@ -130,7 +130,9 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 
 	var filterServer *server.ServerProxy = nil
 	if cfg.FilterActive {
+		logger.GetLoggerHub().Info("Try run dns")
 		filterServer, err = NewFilterServerApp(&cfg.FilterServer)
+		logger.GetLoggerHub().Info("Dns running...")
 		if err != nil {
 			logger.GetLoggerHub().Error("Errors in building filterServer, continue without it")
 			cfg.FilterActive = false
