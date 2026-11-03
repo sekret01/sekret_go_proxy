@@ -3,6 +3,7 @@ package loggers
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -10,15 +11,15 @@ import (
 
 type ConsoleLogger struct {
 	logChan chan string
+	mu      sync.Mutex
 }
 
 func (l *ConsoleLogger) Log(lvl logger.LoggerLevel, msg string) {
 	timeNow := time.Now().Format(time.RFC3339Nano)
 	log := "[" + logger.ColoredLevel(logger.GetLevelName(lvl)) + "] :: " + timeNow + " :: " + strings.Trim(msg, " \n") + "\n"
-	select {
-	case l.logChan <- log:
-	default:
-	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.logChan <- log
 }
 
 func (l *ConsoleLogger) Debug(msg string)    { l.Log(logger.DEBUG, msg) }
@@ -35,7 +36,7 @@ func (l *ConsoleLogger) ChanenelReader() {
 
 func NewConsoleLogger() logger.Logger {
 	lg := &ConsoleLogger{
-		logChan: make(chan string),
+		logChan: make(chan string, 1000),
 	}
 	go lg.ChanenelReader()
 	return lg
