@@ -52,7 +52,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	hub.Info("shutdown signal")
+	hub.Info("SHUTDOWN SIGNAL")
 	admin.Stop(ctx)
 }
 
@@ -110,7 +110,7 @@ func buildServerApp(hub logger.LoggerHub, cfg *config.Config) (webadmin.Controll
 func buildServerProxyApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerApp {
 	server, err := app.NewServerApp(cfg)
 	if err != nil {
-		hub.Critical("[buildServerApp]: " + err.Error())
+		hub.Critical("[buildServerProxyApp]: " + err.Error())
 		criticalExit()
 	}
 	return server

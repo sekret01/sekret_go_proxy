@@ -75,6 +75,7 @@ func (t *TunnelNode) tunnelReader() {
 	for {
 		select {
 		case <-t.done:
+			t.logger.Info("[tunnelReader] Get done signal, exit")
 			return
 		default:
 		}
@@ -102,7 +103,7 @@ func (t *TunnelNode) tunnelWriter() {
 	for {
 		select {
 		case <-t.done:
-			t.logger.Debug("[tunnelWriter] Tunnel is close, exit")
+			t.logger.Debug("[tunnelWriter] Get done signal, exit")
 			return
 		case <-t.tunnelReadChan.done:
 			t.logger.Debug("[tunnelWriter] Read cheannel is close, exit")

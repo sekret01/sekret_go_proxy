@@ -18,12 +18,15 @@ type CompositeHandshakeAuth struct {
 
 func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
+	a.logger.Debug("[ServerHandshake] Start server handshake with " + conn.RemoteAddr().String())
 	if ctx == nil {
 		return ctx, core.ErrEncorrectHandshakeContext
 	}
 	secureConn := core.NewSecureConn(conn, a.enc)
 	for _, step := range a.steps {
+		a.logger.Debug("[ServerHandshake] Process step " + step.Name() + " with " + conn.RemoteAddr().String())
 		if err := step.ServerSide(ctx, secureConn); err != nil {
+			a.logger.Debug("[ServerHandshake] Fail step " + step.Name() + " with " + conn.RemoteAddr().String())
 			return ctx, err
 		}
 	}
@@ -32,12 +35,15 @@ func (a *CompositeHandshakeAuth) ServerHandshake(conn net.Conn) (*core.Handshake
 
 func (a *CompositeHandshakeAuth) ClientHandshake(conn net.Conn) (*core.HandshakeContext, error) {
 	ctx := a.ctxGenerator.NewHandshakeContext()
+	a.logger.Debug("[ServerHandshake] Start client handshake with " + conn.RemoteAddr().String())
 	if ctx == nil {
 		return ctx, core.ErrEncorrectHandshakeContext
 	}
 	secureConn := core.NewSecureConn(conn, a.enc)
 	for _, step := range a.steps {
+		a.logger.Debug("[ServerHandshake] Process step " + step.Name() + " with " + conn.RemoteAddr().String())
 		if err := step.ClientSide(ctx, secureConn); err != nil {
+			a.logger.Debug("[ServerHandshake] Fail step " + step.Name() + " with " + conn.RemoteAddr().String())
 			return ctx, err
 		}
 	}

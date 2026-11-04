@@ -138,8 +138,8 @@ func (b *BaseBootstrap) ClientBootstrap(con net.Conn) (steps []string, sessionKe
 		return nil, nil, err
 	}
 	return msg.Steps, clientWriteKey, nil
-
 }
+
 func (b *BaseBootstrap) ServerBootstrap(con net.Conn) (steps []string, sessionKey []byte, err error) {
 	msg, err := b.readBootstrapMsg(con)
 	if err != nil {

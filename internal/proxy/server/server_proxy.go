@@ -143,7 +143,7 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 	for {
 		select {
 		case <-channel.Done():
-			s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "] ")
+			s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "]")
 			return
 		case data := <-channel.GetChannel():
 			s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
@@ -165,19 +165,19 @@ func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCo
 	for {
 		select {
 		case <-tunnelNodeWrapper.Node().GetWriteChan().Done():
-			s.logger.Debug("[targetConnectinoHandler] Tunnel is closed, exit targetConnectinoHandler")
+			s.logger.Debug("[targetConnectinoHandler] Tunnel is closed, exit targetConnectinoHandler [" + utils.RequestIdToString(requestId) + "]")
 			return
 		default:
 			targetCon.SetDeadline(time.Now().Add(10 * time.Second))
 			size, err := targetCon.Read(buf)
 			if err != nil {
 				if !(errors.Is(err, net.ErrClosed) || err == io.EOF) {
-					s.logger.Debug("[targetConnectinoHandler] Client disconnect with error: " + err.Error())
+					s.logger.Debug("[targetConnectinoHandler] Client [" + utils.RequestIdToString(requestId) + "]  disconnect with error: " + err.Error())
 				}
 				return
 			}
 			if size == 0 {
-				s.logger.Debug("[targetConnectinoHandler] Client disconnect with data size 0")
+				s.logger.Debug("[targetConnectinoHandler] Client [" + utils.RequestIdToString(requestId) + "] disconnect with data size 0")
 				return
 			}
 			s.tunnelEngine.sendIntoTunnel(requestId, core.MsgData, buf[:size], tunnelNodeWrapper)

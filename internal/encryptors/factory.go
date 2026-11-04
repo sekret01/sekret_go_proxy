@@ -1,7 +1,6 @@
 package encryptors
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -23,7 +22,6 @@ func Reigstrate(key string, factory factoryFunc) {
 		panic("Encryption [" + key + "] already exists")
 	}
 	encryptionsMap[key] = factory
-	fmt.Printf("Encryptor [%s] has been registrated\n", key)
 }
 
 // Попытка получить encryptor-factory по ключу.

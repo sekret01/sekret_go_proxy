@@ -1,7 +1,6 @@
 package auths
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -21,7 +20,6 @@ func Reigstrate(key string, factory factoryFunc) {
 		panic("Auth module [" + key + "] already exists")
 	}
 	authMap[key] = factory
-	fmt.Printf("Auth [%s] has been registrated\n", key)
 }
 
 func get(key string) (factoryFunc, error) {
