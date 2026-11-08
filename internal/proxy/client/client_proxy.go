@@ -41,7 +41,7 @@ func (c *ClientProxy) Start() error {
 
 func (c *ClientProxy) startMainTunnel() error {
 	if c.mainTunnelEngine.IsRunning() {
-		c.logger.Warning("[Start] Trying to start running service, return")
+		c.logger.Warning("[startMainTunnel] Trying to start running service, return")
 		return nil
 	}
 	c.mainTunnelEngine.SetLaunch()
@@ -51,23 +51,23 @@ func (c *ClientProxy) startMainTunnel() error {
 			return err
 		}
 
-		c.logger.Info("Start listen on " + c.localAddr)
+		c.logger.Info("[startMainTunnel] Start listen on " + c.localAddr)
 		listener, err := c.mainTunnelEngine.transport.Listen(c.localAddr)
 		if err != nil {
 			c.mainTunnelEngine.SetStopped()
-			c.logger.Error("Tunnel connection error: " + err.Error())
+			c.logger.Error("[startMainTunnel] Tunnel connection error: " + err.Error())
 			return err
 		}
 		go c.listenTunnelMessages(c.mainTunnelEngine)
 		c.connectionsListener(listener)
-		c.logger.Info("Stop tunnel and connections listening")
+		c.logger.Info("[startMainTunnel] Stop tunnel and connections listening")
 	}
 	return nil
 }
 
 func (c *ClientProxy) startFilterTunnel() error {
 	if c.filterTunnelEngine.IsRunning() {
-		c.logger.Warning("[Start] Trying to start running service, return")
+		c.logger.Warning("[startFilterTunnel] Trying to start running service, return")
 		return nil
 	}
 	c.filterTunnelEngine.SetLaunch()
@@ -132,18 +132,18 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 	if !c.mainTunnelEngine.IsRunning() {
 		return
 	}
-	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
+	c.logger.Debug("[newConnectionHandler] New connection: " + requestConn.RemoteAddr().String())
 
 	reader := bufio.NewReader(requestConn)
 	data, err := reader.ReadString('\n')
 	if err != nil {
 		if err != io.EOF {
-			c.logger.Error("Error in read data: " + err.Error())
+			c.logger.Error("[newConnectionHandler] Error in read data: " + err.Error()) // TODO: debug
 		}
 		requestConn.Close()
 		return
 	}
-	c.logger.Debug("Get data: " + utils.BytesToString([]byte(data), 20))
+	c.logger.Debug("[newConnectionHandler] Get data: " + utils.BytesToString([]byte(data), 20))
 
 	reader = bufio.NewReader(io.MultiReader(bytes.NewReader([]byte(data)), reader))
 
@@ -157,7 +157,7 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 
 	proto, err := c.detector.Detect([]byte(data[:prefixSize]))
 	if err != nil {
-		c.logger.Error("Can not detect protocol: " + err.Error())
+		c.logger.Error("[newConnectionHandler] Can not detect protocol: " + err.Error())
 		requestConn.Close()
 		return
 	}
@@ -167,20 +167,20 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 func (c *ClientProxy) switchProtocol(proto core.ProtocolType, requestConn net.Conn, reader *bufio.Reader) {
 	switch proto {
 	case core.ProtoUnknown:
-		c.logger.Debug("Get uncknown protocol, close, " + requestConn.RemoteAddr().String())
+		c.logger.Debug("[switchProtocol Get uncknown protocol, close, " + requestConn.RemoteAddr().String())
 		requestConn.Close()
 		return
 	case core.ProtoSOCKS5:
-		c.logger.Debug("Get SOCKS5 protocol, close " + requestConn.RemoteAddr().String())
+		c.logger.Debug("[switchProtocol Get SOCKS5 protocol, close " + requestConn.RemoteAddr().String())
 		requestConn.Close()
 		return
 	case core.ProtoHTTP:
-		c.logger.Debug("Get HTTP protocol, handle " + requestConn.RemoteAddr().String())
+		c.logger.Debug("[switchProtocol Get HTTP protocol, handle " + requestConn.RemoteAddr().String())
 		c.handlerHttpProto(reader, requestConn)
 		requestConn.Close()
 		return
 	default:
-		c.logger.Debug("Protocol not found, close " + requestConn.RemoteAddr().String())
+		c.logger.Debug("[switchProtocol Protocol not found, close " + requestConn.RemoteAddr().String())
 		return
 	}
 }
@@ -240,7 +240,7 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 
 		buf := make([]byte, 32*1024)
 		n, _ := reader.Read(buf)
-		c.logger.Debug("[handlerHttpProto]:  from:[ " + requestConn.RemoteAddr().String() + " ] Get http buf: " + utils.BytesToString(buf, 20))
+		c.logger.Debug("[handlerHttpProto]:  from: [ " + requestConn.RemoteAddr().String() + " ] Get http buf: " + utils.BytesToString(buf, 20))
 
 		c.distributeTunnelAndSend(requestId, core.MsgData, append([]byte(headerFirstString), buf[:n]...), filter)
 		return
@@ -268,12 +268,12 @@ func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, reques
 	for c.mainTunnelEngine.IsRunning() {
 		size, err := requestConn.Read(buf)
 		if err != nil {
-			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
+			c.logger.Debug("[listenFromClientForTunnel] Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
 			c.distributeTunnelAndSendClose(requestId, filter)
 			return
 		}
 		if size == 0 {
-			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect")
+			c.logger.Debug("[listenFromClientForTunnel] Client [ " + utils.RequestIdToString(requestId) + " ] disconnect")
 			c.distributeTunnelAndSendClose(requestId, filter)
 			return
 		}
@@ -326,7 +326,7 @@ func (c *ClientProxy) listenTunnelMessages(tunnelEngine *TunnelEngine) {
 func (c *ClientProxy) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
 	requestId := core.GenerateID()
 	c.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
-	c.logger.Debug("Save conn [ " + requestConn.RemoteAddr().String() + " ]  with UUID " + utils.RequestIdToString(requestId))
+	c.logger.Debug("[generateAndRegistrateId Save conn [ " + requestConn.RemoteAddr().String() + " ]  with UUID " + utils.RequestIdToString(requestId))
 	return requestId
 }
 
