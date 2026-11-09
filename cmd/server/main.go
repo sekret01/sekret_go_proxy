@@ -23,8 +23,6 @@ import (
 )
 
 func main() {
-	utils.RunPprof()
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -34,6 +32,7 @@ func main() {
 	hub.Info("START LOAD CONFIG")
 	cfg := loadConfig(hub)
 	setLoggerConfig(hub, cfg)
+	utils.RunPprof(cfg.PprofHost)
 
 	printRegistrates(hub)
 

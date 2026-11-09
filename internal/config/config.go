@@ -14,6 +14,7 @@ type ConnectionConfig struct {
 	ConnectionType string `yaml:"connection_type"`
 	LocalHost      string `yaml:"localhost"`
 	RemoteHost     string `yaml:"remotehost"`
+	PprofHost      string `yaml:"pprofhost"`
 }
 
 type FilterConfig struct {

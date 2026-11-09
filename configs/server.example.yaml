@@ -2,6 +2,7 @@ connection:
   connection_type: proxy
   localhost: 127.0.0.1:15980
   remotehost: 
+  pprofhost: 0.0.0.0:6060
 
 modules:
   transport_type: tcp

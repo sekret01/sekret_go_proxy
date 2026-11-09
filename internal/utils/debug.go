@@ -17,9 +17,9 @@ func RunGorutineCounter() {
 	}()
 }
 
-func RunPprof() {
+func RunPprof(host string) {
 	go func() {
 		fmt.Println("Run Pprof")
-		fmt.Println(http.ListenAndServe("127.0.0.1:6060", nil))
+		fmt.Println(http.ListenAndServe(host, nil))
 	}()
 }
