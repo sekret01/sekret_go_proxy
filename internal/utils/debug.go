@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"runtime"
@@ -20,6 +19,7 @@ func RunGorutineCounter() {
 
 func RunPprof() {
 	go func() {
-		log.Println(http.ListenAndServe("127.0.0.1:6060", nil))
+		fmt.Println("Run Pprof")
+		fmt.Println(http.ListenAndServe("127.0.0.1:6060", nil))
 	}()
 }
