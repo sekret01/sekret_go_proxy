@@ -1,7 +1,6 @@
 package dispatchers
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
@@ -21,7 +20,6 @@ func Register(key string, factory factoryFunc) {
 		panic("Encryption [" + key + "] already exists")
 	}
 	dispatchersMap[key] = factory
-	fmt.Printf("Dispatcher [%s] has been registrated\n", key)
 }
 
 func get(key string) (factoryFunc, error) {

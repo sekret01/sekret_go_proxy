@@ -273,15 +273,16 @@ func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType co
 		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
 			"], msg: [" + utils.BytesToString(payload, 20) + "]"
 	})
-	buf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
-	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.EncryptTo(buf.Bytes(), []byte(payload))
-	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
-	buf.Free()
+	encodeBuf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
+	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.EncryptTo(encodeBuf.Bytes(), []byte(payload))
+	frameBuf := buffers.GetBuf(len(payloadEncode) + s.framer.HeaderSize() + core.BYTE_16) // TODO аналогично, решить с длинной
+	frame, err := s.framer.FrameTo(frameBuf.Bytes(), payloadEncode, msgType, requestId)   // frame
+	encodeBuf.Free()
 	if err != nil {
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err
 	}
-	tunnelNodeWrapper.Node().Send(frame)
+	tunnelNodeWrapper.Node().Send(frame, frameBuf)
 	return nil
 }
 

@@ -11,7 +11,7 @@ import (
 
 type TunnelNode struct {
 	tunnelReadChan   *SafeChannel
-	tunnelWriteChan  *SafeChannel
+	tunnelWriteChan  *SafeBufferChannel
 	framer           core.Framer
 	connMut          sync.Mutex
 	remoteTunnelNode net.Conn
@@ -48,18 +48,24 @@ func (t *TunnelNode) GetReadChan() *SafeChannel {
 	return t.tunnelReadChan
 }
 
-func (t *TunnelNode) GetWriteChan() *SafeChannel {
+func (t *TunnelNode) GetWriteChan() *SafeBufferChannel {
 	t.logger.Debug("[GetWriteChan] Write chan taken")
 	return t.tunnelWriteChan
 }
 
-func (t *TunnelNode) Send(frame []byte) error {
+func (t *TunnelNode) Send(frame []byte, buf core.Buffer) error { // TODO-DEL frame []byte
 	select {
 	case <-t.done:
+		if buf != nil {
+			buf.Free()
+		}
 		t.logger.Debug("[Send] Tunnel is close, exit")
 		return nil
 	default:
-		if !t.tunnelWriteChan.Put(frame) {
+		if !t.tunnelWriteChan.Put(&BufferFrame{Frame: frame, Buf: buf}) {
+			if buf != nil {
+				buf.Free()
+			}
 			t.logger.Debug("[Send] tunnel is closed, abort sending")
 			return core.ErrTunnelClosed
 		}
@@ -107,15 +113,17 @@ func (t *TunnelNode) tunnelWriter() {
 		case <-t.tunnelReadChan.done:
 			t.logger.Debug("[tunnelWriter] Read cheannel is close, exit")
 			return
-		case frame := <-t.tunnelWriteChan.GetChannel():
+		case bufFrame := <-t.tunnelWriteChan.GetChannel():
 			t.connMut.Lock()
 			if t.remoteTunnelNode == nil {
 				t.logger.Debug("[tunnelWriter] remoteTunnelNode is nil, exit")
 				t.connMut.Unlock()
+				bufFrame.Buf.Free()
 				return
 			}
-			_, err := t.remoteTunnelNode.Write(frame) // TODO мб через done
+			_, err := t.remoteTunnelNode.Write(bufFrame.Frame) // TODO мб через done
 			t.connMut.Unlock()
+			bufFrame.Buf.Free()
 			if err != nil {
 				t.logger.Error("[tunnelWriter] Error in send data: " + err.Error())
 				t.Stop()
@@ -129,7 +137,7 @@ func (t *TunnelNode) tunnelWriter() {
 func NewTunnelNode(remoteConn net.Conn, framer core.Framer) *TunnelNode {
 	node := &TunnelNode{
 		tunnelReadChan:   NewSafeChannel(),
-		tunnelWriteChan:  NewSafeChannel(),
+		tunnelWriteChan:  NewSafeBufferChannel(),
 		remoteTunnelNode: remoteConn,
 		framer:           framer,
 		isRunning:        true,
@@ -224,6 +232,54 @@ func (s *SafeMessageChannel) Close() {
 func NewSafeMessageChannel() *SafeMessageChannel {
 	return &SafeMessageChannel{
 		channel: make(chan *core.MessageData, 1000),
+		isOpen:  true,
+		done:    make(chan struct{}),
+	}
+}
+
+type BufferFrame struct {
+	Frame []byte
+	Buf   core.Buffer
+}
+
+type SafeBufferChannel struct {
+	channel chan *BufferFrame
+	isOpen  bool
+	done    chan struct{}
+	once    sync.Once
+}
+
+func (s *SafeBufferChannel) Put(data *BufferFrame) bool {
+	select {
+	case <-s.done:
+		return false
+	case s.channel <- data:
+		return true
+	}
+}
+
+func (s *SafeBufferChannel) IsOpen() bool {
+	return s.isOpen
+}
+
+func (s *SafeBufferChannel) Done() chan struct{} {
+	return s.done
+}
+
+func (s *SafeBufferChannel) GetChannel() chan *BufferFrame {
+	return s.channel
+}
+
+func (s *SafeBufferChannel) Close() {
+	s.once.Do(func() {
+		close(s.done)
+		s.isOpen = false
+	})
+}
+
+func NewSafeBufferChannel() *SafeBufferChannel {
+	return &SafeBufferChannel{
+		channel: make(chan *BufferFrame, 1000),
 		isOpen:  true,
 		done:    make(chan struct{}),
 	}

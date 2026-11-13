@@ -68,6 +68,62 @@ func (n *DefaultFramer) Unframe(data []byte) ([]byte, core.MessageType, core.Req
 	return payload, msgType, requestId, nil
 }
 
+func (n *DefaultFramer) FrameTo(dst, data []byte, messageType core.MessageType, requestId core.RequestID) ([]byte, error) {
+	headerLen := HEADER_SIZE_LEN
+	totalLen := headerLen + len(data)
+	if cap(dst) < totalLen {
+		dst = make([]byte, totalLen)
+	}
+	offset := 0
+
+	dst[offset] = core.MagicByte
+	offset += MAGIC_BYTE_LEN
+	dst[offset] = byte(messageType)
+	offset += MESSAGE_TYPE_LEN
+	copy(dst[offset:offset+ID_LEN], requestId[:])
+	offset += ID_LEN
+	binary.BigEndian.PutUint32(dst[offset:offset+PAYLOAD_SIZE_LEN], uint32(len(data)))
+	offset += PAYLOAD_SIZE_LEN
+	copy(dst[offset:], data[:])
+	dst = dst[:totalLen]
+	return dst, nil
+}
+
+// Распаковка данных из протокола
+func (n *DefaultFramer) UnframeTo(dst, data []byte) ([]byte, core.MessageType, core.RequestID, error) {
+	headerLen := HEADER_SIZE_LEN
+	if len(data) < headerLen {
+		return nil, core.MsgError, core.RequestID{}, core.ErrInsufficientHeaderLensth
+	}
+	offset := 0
+	magicByte := data[offset]
+	if magicByte != core.MagicByte {
+		return nil, core.MsgError, core.RequestID{}, core.ErrInvalidMagic
+	}
+	offset += MAGIC_BYTE_LEN
+	msgType := core.MessageType(data[offset])
+	offset += MESSAGE_TYPE_LEN
+	requestId := [ID_LEN]byte(data[offset : offset+ID_LEN])
+	offset += ID_LEN
+	dataSize := binary.BigEndian.Uint32(data[offset : offset+PAYLOAD_SIZE_LEN])
+	if dataSize > core.MAX_PAYLOAD_SIZE {
+		return nil, core.MsgError, core.RequestID{}, core.ErrPayloadSizeTooLarge
+	}
+	offset += PAYLOAD_SIZE_LEN
+
+	if uint32(len(data)) < dataSize+uint32(headerLen) {
+		return nil, core.MsgError, core.RequestID{}, core.ErrInsufficientPayloadLensth
+	}
+	if cap(dst) < int(dataSize) {
+		payload := data[offset : offset+int(dataSize)]
+		return payload, msgType, requestId, nil
+	} else {
+		dst = data[offset : offset+int(dataSize)]
+		dst = dst[:dataSize]
+		return dst, msgType, requestId, nil
+	}
+}
+
 // Получение длины для заголовка данного протокола (в байтах)
 func (f *DefaultFramer) HeaderSize() int {
 	return HEADER_SIZE_LEN
