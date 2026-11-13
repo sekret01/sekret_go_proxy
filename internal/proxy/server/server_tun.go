@@ -158,7 +158,9 @@ func (s *ServerTun) tunReader() {
 			continue
 		}
 		data := buf[:n]
-		s.logger.Debug("[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20))
+		s.logger.Debugf(func() string {
+			return "[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20)
+		})
 		dstIp, ok := extractDstIPv4(data)
 		if !ok {
 			s.logger.Debug("[tunReader] Cannot get IP from packet: " + string(dstIp))

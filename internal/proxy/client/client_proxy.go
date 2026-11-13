@@ -143,7 +143,9 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 		requestConn.Close()
 		return
 	}
-	c.logger.Debug("[newConnectionHandler] Get data: " + utils.BytesToString([]byte(data), 20))
+	c.logger.Debugf(func() string {
+		return "[newConnectionHandler] Get data: " + utils.BytesToString([]byte(data), 20)
+	})
 
 	reader = bufio.NewReader(io.MultiReader(bytes.NewReader([]byte(data)), reader))
 
@@ -240,7 +242,9 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 
 		buf := make([]byte, 16*1024)
 		n, _ := reader.Read(buf)
-		c.logger.Debug("[handlerHttpProto]:  from: [ " + requestConn.RemoteAddr().String() + " ] Get http buf: " + utils.BytesToString(buf, 20))
+		c.logger.Debugf(func() string {
+			return "[handlerHttpProto]:  from: [ " + requestConn.RemoteAddr().String() + " ] Get http buf: " + utils.BytesToString(buf, 20)
+		})
 
 		c.distributeTunnelAndSend(requestId, core.MsgData, append([]byte(headerFirstString), buf[:n]...), filter)
 		return
@@ -302,7 +306,9 @@ func (c *ClientProxy) listenTunnelMessages(tunnelEngine *TunnelEngine) {
 				if len(msg.Data) < n {
 					n = len(msg.Data)
 				}
-				c.logger.Debug("[listenTunnelMessages] send data [" + utils.BytesToString(msg.Data, 20) + "...]")
+				c.logger.Debugf(func() string {
+					return "[listenTunnelMessages] send data [" + utils.BytesToString(msg.Data, 20) + "...]"
+				})
 				requestCon.Write(msg.Data)
 				if !conWrapper.IsTunnel {
 					dataStr := string(msg.Data)

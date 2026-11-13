@@ -266,7 +266,10 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 }
 
 func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, tunnelNodeWrapper *TunnelNodeWrapper) error {
-	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
+	s.logger.Debugf(func() string {
+		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
+			"], msg: [" + utils.BytesToString(payload, 20) + "]"
+	})
 	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.Encrypt([]byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {

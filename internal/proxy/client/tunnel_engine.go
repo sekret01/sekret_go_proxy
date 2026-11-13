@@ -201,7 +201,10 @@ func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 	if !t.status.IsRunning() || t.encryptor == nil {
 		return nil
 	}
-	t.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 100) + "]")
+	t.logger.Debugf(func() string {
+		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
+			"], msg: [" + utils.BytesToString(payload, 100) + "]"
+	})
 	payloadEncode := t.encryptor.Encrypt([]byte(payload))
 	frame, err := t.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {

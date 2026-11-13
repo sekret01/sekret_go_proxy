@@ -82,7 +82,9 @@ func (c *ClientTun) tunReader() {
 			return
 		}
 		data := buf[:n]
-		c.logger.Debug("[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20))
+		c.logger.Debugf(func() string {
+			return "[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20)
+		})
 		c.tunnelEngine.sendIntoTunnel(core.GetNoopID(), core.MsgPacket, data)
 	}
 }
@@ -97,7 +99,9 @@ func (c *ClientTun) tunnelMessagesReader() {
 			c.logger.Warning("[tunnelMessagesReader] write data error: " + err.Error())
 			continue
 		}
-		c.logger.Debug("[tunnelMessagesReader] write data for [ " + utils.RequestIdToString(msg.RequestId) + " ]: " + utils.BytesToString(msg.Data, 20))
+		c.logger.Debugf(func() string {
+			return "[tunnelMessagesReader] write data for [ " + utils.RequestIdToString(msg.RequestId) + " ]: " + utils.BytesToString(msg.Data, 20)
+		})
 	}
 }
 

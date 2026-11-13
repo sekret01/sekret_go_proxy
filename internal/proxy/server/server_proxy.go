@@ -113,7 +113,9 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 	go func() {
 		targetCon, err := s.tunnelEngine.transport.Dial(string(decryptData))
 		if err != nil {
-			s.logger.Debug("[connectAndRegistrate] Can not connect to target server [" + utils.BytesToString(decryptData, 20) + "] " + err.Error())
+			s.logger.Debugf(func() string {
+				return "[connectAndRegistrate] Can not connect to target server [" + utils.BytesToString(decryptData, 20) + "] " + err.Error()
+			})
 			s.closeChannel(requestId)
 			s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper) // TODO добавить сообщения ошибок
 			return
@@ -143,10 +145,14 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 	for {
 		select {
 		case <-channel.Done():
-			s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "]")
+			s.logger.Debugf(func() string {
+				return "[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "]"
+			})
 			return
 		case data := <-channel.GetChannel():
-			s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
+			s.logger.Debugf(func() string {
+				return "[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]"
+			})
 			targetCon.Write(data)
 		}
 	}
