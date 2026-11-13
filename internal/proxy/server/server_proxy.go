@@ -155,13 +155,14 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, tunnelNodeWrapper *TunnelNodeWrapper) {
 	s.logger.Debug("[targetConnectinoHandler] Create new connection: " + targetCon.RemoteAddr().String())
 	defer func() {
+		targetCon.Close()
 		s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper)
 		s.closeChannel(requestId)
 		proxy.CloseConnection(s.dispatcher, requestId)
 
 	}()
 
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, 16*1024)
 	for {
 		select {
 		case <-tunnelNodeWrapper.Node().GetWriteChan().Done():
@@ -171,13 +172,17 @@ func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCo
 			targetCon.SetDeadline(time.Now().Add(10 * time.Second))
 			size, err := targetCon.Read(buf)
 			if err != nil {
+				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					s.logger.Debug("[targetConnectinoHandler] Target [" + utils.RequestIdToString(requestId) + "]  disconnect with timeout")
+					return
+				}
 				if !(errors.Is(err, net.ErrClosed) || err == io.EOF) {
-					s.logger.Debug("[targetConnectinoHandler] Client [" + utils.RequestIdToString(requestId) + "]  disconnect with error: " + err.Error())
+					s.logger.Debug("[targetConnectinoHandler] Target [" + utils.RequestIdToString(requestId) + "]  disconnect with error: " + err.Error())
 				}
 				return
 			}
 			if size == 0 {
-				s.logger.Debug("[targetConnectinoHandler] Client [" + utils.RequestIdToString(requestId) + "] disconnect with data size 0")
+				s.logger.Debug("[targetConnectinoHandler] Target [" + utils.RequestIdToString(requestId) + "] disconnect with data size 0")
 				return
 			}
 			s.tunnelEngine.sendIntoTunnel(requestId, core.MsgData, buf[:size], tunnelNodeWrapper)

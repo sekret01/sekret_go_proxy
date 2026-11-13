@@ -238,7 +238,7 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 		filter := c.filter.Check(prepTarget)
 		c.distributeTunnelAndSend(requestId, core.MsgConnect, []byte(prepTarget), filter)
 
-		buf := make([]byte, 32*1024)
+		buf := make([]byte, 16*1024)
 		n, _ := reader.Read(buf)
 		c.logger.Debug("[handlerHttpProto]:  from: [ " + requestConn.RemoteAddr().String() + " ] Get http buf: " + utils.BytesToString(buf, 20))
 
@@ -264,7 +264,8 @@ func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, reques
 	defer requestConn.Close()
 	defer c.dispatcher.Delete(requestId)
 
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, 16*1024)
+	requestConn.SetDeadline(time.Now().Add(20 * time.Second)) // TODO check
 	for c.mainTunnelEngine.IsRunning() {
 		size, err := requestConn.Read(buf)
 		if err != nil {

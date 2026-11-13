@@ -43,6 +43,22 @@ const (
 	MsgPacket  MessageType = 5
 )
 
+const (
+	BYTE    int = 1
+	BYTE_8  int = BYTE * 8
+	BYTE_16 int = BYTE * 16
+	BYTE_32 int = BYTE * 32
+	BYTE_64 int = BYTE * 64
+
+	KBYTE    int = BYTE * 1024
+	KBYTE_8  int = KBYTE * 8
+	KBYTE_16 int = KBYTE * 16
+	KBYTE_32 int = KBYTE * 32
+	KBYTE_64 int = KBYTE * 64
+
+	MBYTE int = KBYTE * 1024
+)
+
 // STRUCTS
 
 // Структура для хранения информации о подключении
