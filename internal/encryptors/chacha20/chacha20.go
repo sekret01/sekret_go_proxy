@@ -41,6 +41,34 @@ func (c *ChaCha20Encryptor) Decrypt(ciphertext []byte) []byte {
 	return plaintext
 }
 
+func (c *ChaCha20Encryptor) EncryptTo(dst, plaintext []byte) []byte {
+	nonceSize := c.aead.NonceSize()
+	need := nonceSize + len(plaintext) + c.aead.Overhead()
+	if cap(dst) < need {
+		dst = make([]byte, need)
+	}
+	if _, err := io.ReadFull(rand.Reader, dst[:nonceSize]); err != nil {
+		return nil
+	}
+	return c.aead.Seal(dst[:nonceSize], dst[:nonceSize], plaintext, nil)
+}
+
+func (c *ChaCha20Encryptor) DecryptTo(dst, ciphertext []byte) []byte {
+	nonceSize := c.aead.NonceSize()
+	if len(ciphertext) < nonceSize+c.aead.Overhead() {
+		return nil
+	}
+	need := len(ciphertext) - nonceSize - c.aead.Overhead()
+	if cap(dst) < need {
+		dst = make([]byte, need)
+	}
+	plaintext, err := c.aead.Open(dst[:0], ciphertext[:nonceSize], ciphertext[nonceSize:], nil)
+	if err != nil {
+		return nil
+	}
+	return plaintext
+}
+
 func NewChaCha20(key []byte) (core.Encryptor, error) {
 	if len(key) != chacha20poly1305.KeySize {
 		return nil, errors.New("key must be 32 bytes for ChaCha20-Poly1305")

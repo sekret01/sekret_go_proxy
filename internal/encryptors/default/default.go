@@ -8,13 +8,10 @@ import (
 // Заглушка, для быстрой проверки логики работы системы
 type DefaultEncryptor struct{}
 
-func (m *DefaultEncryptor) Encrypt(data []byte) []byte {
-	return data
-}
-
-func (m *DefaultEncryptor) Decrypt(data []byte) []byte {
-	return data
-}
+func (m *DefaultEncryptor) Encrypt(data []byte) []byte        { return data }
+func (m *DefaultEncryptor) Decrypt(data []byte) []byte        { return data }
+func (m *DefaultEncryptor) EncryptTo(dst, data []byte) []byte { return data }
+func (m *DefaultEncryptor) DecryptTo(dst, data []byte) []byte { return data }
 
 func NewDefaultEncryptor(key []byte) (core.Encryptor, error) {
 	return &DefaultEncryptor{}, nil
