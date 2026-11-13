@@ -24,7 +24,8 @@ var pools []*poolClass = func() []*poolClass {
 	for i, size := range poolSizes {
 		pl[i] = &poolClass{size: size}
 		pl[i].pool.New = func() any {
-			return make([]byte, size)
+			b := make([]byte, size)
+			return &b
 		}
 	}
 	return pl
@@ -50,8 +51,11 @@ func (b *BaseBuffer) Len() int {
 }
 
 func (b *BaseBuffer) Free() {
+	if b == nil {
+		return
+	}
 	b.mu.Lock()
-	if b.freed || b == nil {
+	if b.freed {
 		b.mu.Unlock()
 		return
 	}
@@ -61,14 +65,14 @@ func (b *BaseBuffer) Free() {
 		b.data = nil
 		return
 	}
-	b.data = b.data[:0]
-	b.pool.pool.Put(&b.data)
+	tmp := b.data[:0]
+	b.pool.pool.Put(&tmp)
 	b.data = nil
 }
 
 func GetBuf(size int) core.Buffer {
 	for _, s := range pools {
-		if s.size <= size {
+		if s.size >= size {
 			b := s.pool.Get().(*[]byte)
 			*b = (*b)[:size]
 			return &BaseBuffer{
