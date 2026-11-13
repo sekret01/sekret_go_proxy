@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sekret01/sekret_go_proxy/internal/buffers"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -184,11 +185,13 @@ func (t *TunnelEngine) tunnelReader() {
 				t.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
 				continue
 			}
-			decryptData := t.encryptor.Decrypt(data) // TODO-EDIT
+			buf := buffers.GetBuf(len(data))
+			decryptData := t.encryptor.DecryptTo(buf.Bytes(), data) // TODO-EDIT
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
 				Data:      decryptData,
+				Buf:       buf,
 			}
 			t.tunnelMessages <- frameData
 		}

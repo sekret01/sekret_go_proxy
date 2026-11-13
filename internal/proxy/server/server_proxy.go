@@ -13,7 +13,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type chanMap map[core.RequestID]*proxy.SafeChannel
+type chanMap map[core.RequestID]*proxy.SafeMessageChannel // SafeChannel
 
 type ServerProxy struct {
 	tunnelEngine *ServerTunnelEngine
@@ -80,8 +80,9 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 				s.logger.Info("Packet get")
 			case core.MsgConnect:
 				s.connectAndRegistrate(msg.RequestId, msg.Data, &tunWrapper)
+				msg.Buf.Free()
 			case core.MsgData:
-				s.putMessageIntoChannel(msg.RequestId, msg.Data)
+				s.putMessageIntoChannel(msg.RequestId, msg)
 			case core.MsgClose:
 				s.closeChannel(msg.RequestId)
 				conWrapper, ok := s.dispatcher.Find(msg.RequestId)
@@ -92,18 +93,19 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 				}
 				conWrapper.Conn.Close()
 				proxy.CloseConnection(s.dispatcher, msg.RequestId)
+				msg.Buf.Free()
 			}
 		}
 	}
 }
 
-func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeChannel {
+func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeMessageChannel {
 	s.chanMutex.Lock()
 	defer s.chanMutex.Unlock()
 	if ch, ex := s.connChannels[requestId]; ex {
 		return ch
 	}
-	ch := proxy.NewSafeChannel()
+	ch := proxy.NewSafeMessageChannel()
 	s.connChannels[requestId] = ch
 	return ch
 }
@@ -126,21 +128,21 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 	}()
 }
 
-func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, decryptData []byte) {
+func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, msg core.MessageData) {
 	s.chanMutex.RLock()
 	safeChannel, ex := s.connChannels[requestId]
 	s.chanMutex.RUnlock()
 	if !ex {
 		return
 	}
-	if ok := safeChannel.Put(decryptData); ok {
+	if ok := safeChannel.Put(msg); ok {
 		s.logger.Debug("[putMessageIntoChannel] put new message [" + utils.RequestIdToString(requestId) + "] ")
 	} else {
 		s.logger.Debug("[putMessageIntoChannel] WARNING cannot put msg [" + utils.RequestIdToString(requestId) + "] into channel")
 	}
 }
 
-func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.SafeChannel, targetCon net.Conn) {
+func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.SafeMessageChannel, targetCon net.Conn) {
 	s.logger.Debug("[conChannelReader] start read chan for [" + utils.RequestIdToString(requestId) + " ]")
 	for {
 		select {
@@ -149,11 +151,12 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 				return "[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "]"
 			})
 			return
-		case data := <-channel.GetChannel():
+		case msg := <-channel.GetChannel():
 			s.logger.Debugf(func() string {
-				return "[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]"
+				return "[conChannelReader] send data [" + utils.BytesToString(msg.Data, 20) + "...]"
 			})
-			targetCon.Write(data)
+			targetCon.Write(msg.Data)
+			msg.Buf.Free()
 		}
 	}
 }

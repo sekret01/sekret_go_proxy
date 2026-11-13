@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -157,8 +156,6 @@ func (s *SafeChannel) Put(data []byte) bool {
 		return false
 	case s.channel <- data:
 		return true
-	case <-time.After(time.Second * 5):
-		return false
 	}
 }
 
@@ -184,6 +181,49 @@ func (s *SafeChannel) Close() {
 func NewSafeChannel() *SafeChannel {
 	return &SafeChannel{
 		channel: make(chan []byte, 1000),
+		isOpen:  true,
+		done:    make(chan struct{}),
+	}
+}
+
+type SafeMessageChannel struct {
+	channel chan core.MessageData
+	isOpen  bool
+	done    chan struct{}
+	once    sync.Once
+}
+
+func (s *SafeMessageChannel) Put(data core.MessageData) bool {
+	select {
+	case <-s.done:
+		return false
+	case s.channel <- data:
+		return true
+	}
+}
+
+func (s *SafeMessageChannel) IsOpen() bool {
+	return s.isOpen
+}
+
+func (s *SafeMessageChannel) Done() chan struct{} {
+	return s.done
+}
+
+func (s *SafeMessageChannel) GetChannel() chan core.MessageData {
+	return s.channel
+}
+
+func (s *SafeMessageChannel) Close() {
+	s.once.Do(func() {
+		close(s.done)
+		s.isOpen = false
+	})
+}
+
+func NewSafeMessageChannel() *SafeMessageChannel {
+	return &SafeMessageChannel{
+		channel: make(chan core.MessageData, 1000),
 		isOpen:  true,
 		done:    make(chan struct{}),
 	}

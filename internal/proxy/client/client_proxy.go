@@ -326,6 +326,7 @@ func (c *ClientProxy) listenTunnelMessages(tunnelEngine *TunnelEngine) {
 				requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
 				proxy.CloseConnection(c.dispatcher, msg.RequestId)
 			}
+			msg.Buf.Free()
 		}
 	}
 }

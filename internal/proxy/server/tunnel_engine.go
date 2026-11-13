@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/sekret01/sekret_go_proxy/internal/buffers"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -120,7 +121,7 @@ func (s *ServerTunnelEngine) GetTunnelNodeWrapperForIp(ip string) *TunnelNodeWra
 func (s *ServerTunnelEngine) GetConnectedIps() []string {
 	s.connMutex.Lock()
 	res := []string{}
-	for ip, _ := range s.tunnelNodesMap {
+	for ip := range s.tunnelNodesMap {
 		res = append(res, ip)
 	}
 	s.connMutex.Unlock()
@@ -250,11 +251,13 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 				s.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
 				continue
 			}
-			decryptData := tunnelNodeWrapper.Moduls.Encryptor.Decrypt(data) // TODO-EDIT
+			buf := buffers.GetBuf(len(data))
+			decryptData := tunnelNodeWrapper.Moduls.Encryptor.DecryptTo(buf.Bytes(), data) // TODO-EDIT
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
 				Data:      decryptData,
+				Buf:       buf,
 			}
 			select {
 			case <-tunnelNodeWrapper.Node().Done():

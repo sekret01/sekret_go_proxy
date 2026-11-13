@@ -73,6 +73,7 @@ type MessageData struct {
 	MsgType   MessageType
 	RequestId RequestID
 	Data      []byte
+	Buf       Buffer
 }
 
 type ConnectData struct {

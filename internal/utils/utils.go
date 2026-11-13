@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"os/exec"
 	"strconv"
 
@@ -26,7 +25,6 @@ func ListToString(list []string) string {
 }
 
 func BytesToString(data []byte, needLen int) string {
-	fmt.Println("BytesToString WAS ACTIVE") // TODO-DEL
 	resultLen := min(needLen, len(data))
 	result := strconv.Quote(string(data[:resultLen]))
 	if len(data) > resultLen {

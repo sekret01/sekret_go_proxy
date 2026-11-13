@@ -102,6 +102,7 @@ func (c *ClientTun) tunnelMessagesReader() {
 		c.logger.Debugf(func() string {
 			return "[tunnelMessagesReader] write data for [ " + utils.RequestIdToString(msg.RequestId) + " ]: " + utils.BytesToString(msg.Data, 20)
 		})
+		msg.Buf.Free()
 	}
 }
 

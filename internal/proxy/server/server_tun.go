@@ -114,6 +114,7 @@ func (s *ServerTun) TunnelNodeHandler(tunWrapper *TunnelNodeWrapper) {
 			case core.MsgClose:
 				s.releaseSession(tunWrapper.Node())
 			}
+			msg.Buf.Free()
 		}
 	}
 }
