@@ -22,11 +22,17 @@ func (l *FileLogger) Log(lvl logger.LoggerLevel, msg string) {
 	l.logChan <- log
 }
 
+func (l *FileLogger) Logf(lvl logger.LoggerLevel, lazy func() string) {
+	l.Log(lvl, lazy())
+}
+
 func (l *FileLogger) Debug(msg string)    { l.Log(logger.DEBUG, msg) }
 func (l *FileLogger) Info(msg string)     { l.Log(logger.INFO, msg) }
 func (l *FileLogger) Warning(msg string)  { l.Log(logger.WARNING, msg) }
 func (l *FileLogger) Error(msg string)    { l.Log(logger.ERROR, msg) }
 func (l *FileLogger) Critical(msg string) { l.Log(logger.CRITICAL, msg) }
+
+func (l *FileLogger) Debugf(lazy func() string) { l.Logf(logger.DEBUG, lazy) }
 
 func (l *FileLogger) ChanenelReader() {
 	file, err := os.OpenFile("logs/logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

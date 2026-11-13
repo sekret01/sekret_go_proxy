@@ -52,11 +52,26 @@ func (h *Hub) Log(lvl LoggerLevel, msg string) {
 	}
 }
 
+func (h *Hub) Logf(lvl LoggerLevel, lazy func() string) {
+	h.mu.RLock()
+	curLvl := h.level
+	loggersCopy := make([]Logger, len(h.loggers))
+	copy(loggersCopy, h.loggers)
+	h.mu.RUnlock()
+	if lvl >= curLvl {
+		for _, logger := range loggersCopy {
+			logger.Log(lvl, lazy())
+		}
+	}
+}
+
 func (h *Hub) Debug(msg string)    { h.Log(DEBUG, msg) }
 func (h *Hub) Info(msg string)     { h.Log(INFO, msg) }
 func (h *Hub) Warning(msg string)  { h.Log(WARNING, msg) }
 func (h *Hub) Error(msg string)    { h.Log(ERROR, msg) }
 func (h *Hub) Critical(msg string) { h.Log(CRITICAL, msg) }
+
+func (h *Hub) Debugf(lazy func() string) { h.Logf(DEBUG, lazy) }
 
 var hub *Hub = nil
 

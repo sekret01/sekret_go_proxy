@@ -22,11 +22,17 @@ func (l *ConsoleLogger) Log(lvl logger.LoggerLevel, msg string) {
 	l.logChan <- log
 }
 
+func (l *ConsoleLogger) Logf(lvl logger.LoggerLevel, lazy func() string) {
+	l.Log(lvl, lazy())
+}
+
 func (l *ConsoleLogger) Debug(msg string)    { l.Log(logger.DEBUG, msg) }
 func (l *ConsoleLogger) Info(msg string)     { l.Log(logger.INFO, msg) }
 func (l *ConsoleLogger) Warning(msg string)  { l.Log(logger.WARNING, msg) }
 func (l *ConsoleLogger) Error(msg string)    { l.Log(logger.ERROR, msg) }
 func (l *ConsoleLogger) Critical(msg string) { l.Log(logger.CRITICAL, msg) }
+
+func (l *ConsoleLogger) Debugf(lazy func() string) { l.Logf(logger.DEBUG, lazy) }
 
 func (l *ConsoleLogger) ChanenelReader() {
 	for log := range l.logChan {

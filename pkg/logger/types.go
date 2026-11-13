@@ -7,7 +7,9 @@ type LoggerHub interface {
 	SetLevel(lvl LoggerLevel)
 	WithModule(module string) Logger
 	Log(lvl LoggerLevel, msg string)
+	Logf(lvl LoggerLevel, lazy func() string)
 	Debug(msg string)
+	Debugf(lazy func() string)
 	Info(msg string)
 	Warning(msg string)
 	Error(msg string)
@@ -16,7 +18,9 @@ type LoggerHub interface {
 
 type Logger interface {
 	Log(lvl LoggerLevel, msg string)
+	Logf(lvl LoggerLevel, lazy func() string)
 	Debug(msg string)
+	Debugf(lazy func() string)
 	Info(msg string)
 	Warning(msg string)
 	Error(msg string)
