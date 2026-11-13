@@ -252,7 +252,7 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 				continue
 			}
 			buf := buffers.GetBuf(len(data))
-			decryptData := tunnelNodeWrapper.Moduls.Encryptor.DecryptTo(buf.Bytes(), data) // TODO-EDIT
+			decryptData := tunnelNodeWrapper.Moduls.Encryptor.DecryptTo(buf.Bytes(), data)
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
@@ -273,8 +273,10 @@ func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType co
 		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
 			"], msg: [" + utils.BytesToString(payload, 20) + "]"
 	})
-	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.Encrypt([]byte(payload)) // TODO-EDIT
+	buf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
+	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.EncryptTo(buf.Bytes(), []byte(payload))
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
+	buf.Free()
 	if err != nil {
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err

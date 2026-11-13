@@ -135,7 +135,7 @@ func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, msg core.M
 	if !ex {
 		return
 	}
-	if ok := safeChannel.Put(msg); ok {
+	if ok := safeChannel.Put(&msg); ok {
 		s.logger.Debug("[putMessageIntoChannel] put new message [" + utils.RequestIdToString(requestId) + "] ")
 	} else {
 		s.logger.Debug("[putMessageIntoChannel] WARNING cannot put msg [" + utils.RequestIdToString(requestId) + "] into channel")

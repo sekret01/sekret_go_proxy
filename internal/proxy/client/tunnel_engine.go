@@ -186,7 +186,7 @@ func (t *TunnelEngine) tunnelReader() {
 				continue
 			}
 			buf := buffers.GetBuf(len(data))
-			decryptData := t.encryptor.DecryptTo(buf.Bytes(), data) // TODO-EDIT
+			decryptData := t.encryptor.DecryptTo(buf.Bytes(), data)
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
@@ -208,8 +208,10 @@ func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
 			"], msg: [" + utils.BytesToString(payload, 100) + "]"
 	})
-	payloadEncode := t.encryptor.Encrypt([]byte(payload)) // TODO-EDIT
+	buf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
+	payloadEncode := t.encryptor.EncryptTo(buf.Bytes(), []byte(payload))
 	frame, err := t.framer.Frame(payloadEncode, msgType, requestId)
+	buf.Free()
 	if err != nil {
 		t.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
 		return err

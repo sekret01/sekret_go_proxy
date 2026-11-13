@@ -187,13 +187,13 @@ func NewSafeChannel() *SafeChannel {
 }
 
 type SafeMessageChannel struct {
-	channel chan core.MessageData
+	channel chan *core.MessageData
 	isOpen  bool
 	done    chan struct{}
 	once    sync.Once
 }
 
-func (s *SafeMessageChannel) Put(data core.MessageData) bool {
+func (s *SafeMessageChannel) Put(data *core.MessageData) bool {
 	select {
 	case <-s.done:
 		return false
@@ -210,7 +210,7 @@ func (s *SafeMessageChannel) Done() chan struct{} {
 	return s.done
 }
 
-func (s *SafeMessageChannel) GetChannel() chan core.MessageData {
+func (s *SafeMessageChannel) GetChannel() chan *core.MessageData {
 	return s.channel
 }
 
@@ -223,7 +223,7 @@ func (s *SafeMessageChannel) Close() {
 
 func NewSafeMessageChannel() *SafeMessageChannel {
 	return &SafeMessageChannel{
-		channel: make(chan core.MessageData, 1000),
+		channel: make(chan *core.MessageData, 1000),
 		isOpen:  true,
 		done:    make(chan struct{}),
 	}
