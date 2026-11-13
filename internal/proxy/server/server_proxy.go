@@ -53,7 +53,7 @@ func (s *ServerProxy) GetUsers() []string {
 }
 
 func (s *ServerProxy) NewHandshakeContext() *core.HandshakeContext {
-	ctx := &core.HandshakeContext{} // TODO добавить генерацию 32b ключа
+	ctx := &core.HandshakeContext{}
 	encKey := utils.Generate32ByteKey()
 	ctx.EncryptorKey = encKey
 	return ctx
@@ -78,17 +78,19 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 			switch msg.MsgType {
 			case core.MsgPacket:
 				s.logger.Info("Packet get")
+				msg.Buf.Free()
 			case core.MsgConnect:
 				s.connectAndRegistrate(msg.RequestId, msg.Data, &tunWrapper)
 				msg.Buf.Free()
 			case core.MsgData:
-				s.putMessageIntoChannel(msg.RequestId, msg)
+				s.putMessageIntoChannel(msg.RequestId, &msg)
 			case core.MsgClose:
 				s.closeChannel(msg.RequestId)
 				conWrapper, ok := s.dispatcher.Find(msg.RequestId)
 				s.logger.Debug("[TunnelReaderHandler] Get close message [" + utils.RequestIdToString(msg.RequestId) + "]")
 				if !ok {
 					s.logger.Debug("[TunnelReaderHandler] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+					msg.Buf.Free()
 					continue
 				}
 				conWrapper.Conn.Close()
@@ -101,11 +103,16 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 
 func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeMessageChannel {
 	s.chanMutex.Lock()
-	defer s.chanMutex.Unlock()
 	if ch, ex := s.connChannels[requestId]; ex {
+		s.chanMutex.Unlock()
 		return ch
 	}
+	s.chanMutex.Unlock()
+
 	ch := proxy.NewSafeMessageChannel()
+
+	s.chanMutex.Lock()
+	defer s.chanMutex.Unlock()
 	s.connChannels[requestId] = ch
 	return ch
 }
@@ -119,7 +126,7 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 				return "[connectAndRegistrate] Can not connect to target server [" + utils.BytesToString(decryptData, 20) + "] " + err.Error()
 			})
 			s.closeChannel(requestId)
-			s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper) // TODO добавить сообщения ошибок
+			s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper)
 			return
 		}
 		s.dispatcher.Register(requestId, targetCon, core.ProtoTest, true)
@@ -128,16 +135,16 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 	}()
 }
 
-func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, msg core.MessageData) {
+func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, msg *core.MessageData) {
 	s.chanMutex.RLock()
 	safeChannel, ex := s.connChannels[requestId]
 	s.chanMutex.RUnlock()
 	if !ex {
+		msg.Buf.Free()
 		return
 	}
-	if ok := safeChannel.Put(&msg); ok {
-		s.logger.Debug("[putMessageIntoChannel] put new message [" + utils.RequestIdToString(requestId) + "] ")
-	} else {
+	if ok := safeChannel.Put(msg); !ok {
+		msg.Buf.Free()
 		s.logger.Debug("[putMessageIntoChannel] WARNING cannot put msg [" + utils.RequestIdToString(requestId) + "] into channel")
 	}
 }
@@ -152,9 +159,6 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 			})
 			return
 		case msg := <-channel.GetChannel():
-			s.logger.Debugf(func() string {
-				return "[conChannelReader] send data [" + utils.BytesToString(msg.Data, 20) + "...]"
-			})
 			targetCon.Write(msg.Data)
 			msg.Buf.Free()
 		}

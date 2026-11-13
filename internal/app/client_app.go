@@ -113,8 +113,8 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		logger.GetLoggerHub().WithModule("TunnelEngine [Filter]"),
 		filterAuth,
 		filterBootstrap,
-		"127.0.0.1:35785", // TODO конфиг
-		"default",         // TODO конфиг
+		cfg.FilterServer.Host,
+		cfg.FilterServer.Encryptor,
 	)
 
 	tunnel := client.NewClientProxy(

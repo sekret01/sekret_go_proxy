@@ -245,14 +245,19 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 			delete(s.tunnelNodesMap, ip)
 			s.connMutex.Unlock()
 			return
-		case frame := <-tunnelNodeWrapper.Node().GetReadChan().GetChannel():
-			data, msgType, requestId, err := s.framer.Unframe(frame)
+		case tunBuf := <-tunnelNodeWrapper.Node().GetReadChan().GetChannel():
+			frameBuf := buffers.GetBuf(len(tunBuf.Frame))
+			data, msgType, requestId, err := s.framer.UnframeTo(frameBuf.Bytes(), tunBuf.Frame)
 			if err != nil {
 				s.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
+				frameBuf.Free()
+				tunBuf.Buf.Free()
 				continue
 			}
 			buf := buffers.GetBuf(len(data))
 			decryptData := tunnelNodeWrapper.Moduls.Encryptor.DecryptTo(buf.Bytes(), data)
+			frameBuf.Free()
+			tunBuf.Buf.Free()
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
@@ -261,6 +266,7 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 			}
 			select {
 			case <-tunnelNodeWrapper.Node().Done():
+				buf.Free()
 			default:
 				msgChannel <- frameData
 			}
@@ -274,12 +280,13 @@ func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType co
 			"], msg: [" + utils.BytesToString(payload, 20) + "]"
 	})
 	encodeBuf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
-	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.EncryptTo(encodeBuf.Bytes(), []byte(payload))
+	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.EncryptTo(encodeBuf.Bytes(), payload)
 	frameBuf := buffers.GetBuf(len(payloadEncode) + s.framer.HeaderSize() + core.BYTE_16) // TODO аналогично, решить с длинной
-	frame, err := s.framer.FrameTo(frameBuf.Bytes(), payloadEncode, msgType, requestId)   // frame
+	frame, err := s.framer.FrameTo(frameBuf.Bytes(), payloadEncode, msgType, requestId)
 	encodeBuf.Free()
 	if err != nil {
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
+		frameBuf.Free()
 		return err
 	}
 	tunnelNodeWrapper.Node().Send(frame, frameBuf)

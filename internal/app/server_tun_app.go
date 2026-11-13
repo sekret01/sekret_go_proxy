@@ -71,7 +71,7 @@ func NewServerTunApp(cfg *config.Config) (*ServerTunApp, error) {
 		logger.GetLoggerHub().WithModule("ServerTunnelEngine"),
 	)
 
-	packetDevice, err := packets.NewPacketDevice(runtime.GOOS, cfg) // TODO конфиг / env
+	packetDevice, err := packets.NewPacketDevice(runtime.GOOS, cfg)
 	if err != nil {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildServerApp

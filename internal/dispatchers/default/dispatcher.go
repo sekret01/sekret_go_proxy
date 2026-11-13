@@ -33,7 +33,6 @@ func (d *DefaultDispatcher) Register(id core.RequestID, requestConn net.Conn, pr
 func (d *DefaultDispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	d.logger.Debug("Try to find [ " + utils.RequestIdToString(id) + " ]")
 	conn, exist := d.connections[id]
 	return conn, exist
 }
@@ -42,7 +41,6 @@ func (d *DefaultDispatcher) Find(id core.RequestID) (core.ConnWrapper, bool) {
 func (d *DefaultDispatcher) Delete(id core.RequestID) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.logger.Debug("Delete: [ " + utils.RequestIdToString(id) + " ]")
 	delete(d.connections, id)
 }
 

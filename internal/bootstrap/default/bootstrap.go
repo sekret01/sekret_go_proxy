@@ -22,7 +22,6 @@ type HelloMsg struct {
 	Steps   []string
 }
 
-// можно изменять / вынести отдельно для изменения (core.types)
 var bootstrapMagicBytes []byte = []byte{0x53, 0x24, 0x68, 0x12}
 
 const (

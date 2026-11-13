@@ -10,7 +10,7 @@ import (
 )
 
 type TunnelNode struct {
-	tunnelReadChan   *SafeChannel
+	tunnelReadChan   *SafeBufferChannel
 	tunnelWriteChan  *SafeBufferChannel
 	framer           core.Framer
 	connMut          sync.Mutex
@@ -43,17 +43,15 @@ func (t *TunnelNode) Done() chan struct{} {
 	return t.done
 }
 
-func (t *TunnelNode) GetReadChan() *SafeChannel {
-	t.logger.Debug("[GetReadChan] Read chan taken")
+func (t *TunnelNode) GetReadChan() *SafeBufferChannel {
 	return t.tunnelReadChan
 }
 
 func (t *TunnelNode) GetWriteChan() *SafeBufferChannel {
-	t.logger.Debug("[GetWriteChan] Write chan taken")
 	return t.tunnelWriteChan
 }
 
-func (t *TunnelNode) Send(frame []byte, buf core.Buffer) error { // TODO-DEL frame []byte
+func (t *TunnelNode) Send(frame []byte, buf core.Buffer) error {
 	select {
 	case <-t.done:
 		if buf != nil {
@@ -69,7 +67,6 @@ func (t *TunnelNode) Send(frame []byte, buf core.Buffer) error { // TODO-DEL fra
 			t.logger.Debug("[Send] tunnel is closed, abort sending")
 			return core.ErrTunnelClosed
 		}
-		t.logger.Debug("[Send] Put frame in write chan")
 		return nil
 	}
 
@@ -84,22 +81,25 @@ func (t *TunnelNode) tunnelReader() {
 			return
 		default:
 		}
-		frame, err := ReadFrameFromConnection(t.remoteTunnelNode, t.framer)
+		frameBuf, frame, err := ReadFrameFromConnection(t.remoteTunnelNode, t.framer)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				t.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
-				t.Stop() // TODO проверить нужен ли
+				t.Stop()
 			} else {
 				t.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 				t.Stop()
 			}
+			if frameBuf != nil {
+				frameBuf.Free()
+			}
 			return
 		}
-		if !t.tunnelReadChan.Put(frame) {
+		if !t.tunnelReadChan.Put(&BufferFrame{Frame: frame, Buf: frameBuf}) {
 			t.logger.Debug("[tunnelReader] tunnel is closed or writeChan is full, exit reader")
+			frameBuf.Free()
 			return
 		}
-		t.logger.Debug("[tunnelReader] Put frame in read chan")
 	}
 }
 
@@ -121,7 +121,7 @@ func (t *TunnelNode) tunnelWriter() {
 				bufFrame.Buf.Free()
 				return
 			}
-			_, err := t.remoteTunnelNode.Write(bufFrame.Frame) // TODO мб через done
+			_, err := t.remoteTunnelNode.Write(bufFrame.Frame) // TODO добавить WriteDeadline
 			t.connMut.Unlock()
 			bufFrame.Buf.Free()
 			if err != nil {
@@ -129,14 +129,13 @@ func (t *TunnelNode) tunnelWriter() {
 				t.Stop()
 				return
 			}
-			t.logger.Debug("[tunnelChanReader] Data has been sent")
 		}
 	}
 }
 
 func NewTunnelNode(remoteConn net.Conn, framer core.Framer) *TunnelNode {
 	node := &TunnelNode{
-		tunnelReadChan:   NewSafeChannel(),
+		tunnelReadChan:   NewSafeBufferChannel(),
 		tunnelWriteChan:  NewSafeBufferChannel(),
 		remoteTunnelNode: remoteConn,
 		framer:           framer,

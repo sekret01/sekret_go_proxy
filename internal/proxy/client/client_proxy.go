@@ -138,7 +138,7 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 	data, err := reader.ReadString('\n')
 	if err != nil {
 		if err != io.EOF {
-			c.logger.Error("[newConnectionHandler] Error in read data: " + err.Error()) // TODO: debug
+			c.logger.Error("[newConnectionHandler] Error in read data: " + err.Error())
 		}
 		requestConn.Close()
 		return
@@ -194,7 +194,6 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 		requestConn.Close()
 		return
 	}
-	c.logger.Debug("[handlerHttpProto] Parse [ " + requestConn.RemoteAddr().String() + " ] get header: \n" + strings.Trim(string(headerFirstString), " \n"))
 
 	parsedHeaderFirstString := strings.Fields(headerFirstString)
 	if len(parsedHeaderFirstString) < 2 {
@@ -214,24 +213,19 @@ func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Con
 		filter := false
 
 		if ip := net.ParseIP(host); ip != nil {
-			if c.ipMAp == nil {
-				c.logger.Debug("[handlerHttpProto]: No ipMap to get " + host)
-			} else if domain, ok := c.ipMAp.Get(host); ok {
-				c.logger.Debug("[handlerHttpProto]: Check target " + host + " like ip (ipMap)")
-				c.logger.Debug("[handlerHttpProto]: IP " + host + " found in ipMap")
-				if c.filter.Check(domain) {
-					filter = true
+			if c.ipMAp != nil {
+				if domain, ok := c.ipMAp.Get(host); ok {
+					if c.filter.Check(domain) {
+						filter = true
+					}
 				}
-			} else {
-				c.logger.Debug("[handlerHttpProto]: IP " + host + "fnot ound in ipMap")
 			}
 		} else {
-			c.logger.Debug("[handlerHttpProto]: Check target " + host + " like domain")
 			filter = c.filter.Check(host)
 		}
 
 		requestConn.Write([]byte(core.HttpConnectResponse))
-		c.handleTunnelConnect(requestConn, target, filter) // TODO-DEL target <- host
+		c.handleTunnelConnect(requestConn, target, filter)
 		return
 	} else {
 		requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
@@ -295,20 +289,13 @@ func (c *ClientProxy) listenTunnelMessages(tunnelEngine *TunnelEngine) {
 		case msg := <-tunnelEngine.tunnelMessages:
 			conWrapper, ok := c.dispatcher.Find(msg.RequestId)
 			if !ok {
+				msg.Buf.Free()
 				c.logger.Debug("[listenTunnelMessages] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
 				continue
 			}
 			requestCon := conWrapper.Conn
-			c.logger.Debug("[listenTunnelMessages] Get data [ " + utils.RequestIdToString(msg.RequestId) + " ], msg_type: " + utils.MessageTypeToHexString(msg.MsgType))
 			switch msg.MsgType {
 			case core.MsgData:
-				n := 10
-				if len(msg.Data) < n {
-					n = len(msg.Data)
-				}
-				c.logger.Debugf(func() string {
-					return "[listenTunnelMessages] send data [" + utils.BytesToString(msg.Data, 20) + "...]"
-				})
 				requestCon.Write(msg.Data)
 				if !conWrapper.IsTunnel {
 					dataStr := string(msg.Data)

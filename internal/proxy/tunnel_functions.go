@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/sekret01/sekret_go_proxy/internal/buffers"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
@@ -83,24 +84,31 @@ func NewTunnelStatus() *TunnelStatus {
 	}
 }
 
-func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) ([]byte, error) {
-	bufHeader := make([]byte, framer.HeaderSize())
-	if _, err := io.ReadFull(serverTonnelConn, bufHeader); err != nil {
-		return nil, err
+func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) (core.Buffer, []byte, error) {
+	headerSize := framer.HeaderSize()
+	bufHeader := buffers.GetBuf(headerSize)
+	defer bufHeader.Free()
+	if _, err := io.ReadFull(serverTonnelConn, bufHeader.Bytes()); err != nil {
+		return nil, nil, err
 	}
-	payloadSize, err := framer.GetPayloadSize(bufHeader)
+	payloadSize, err := framer.GetPayloadSize(bufHeader.Bytes())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if payloadSize < 0 || payloadSize > core.MAX_PAYLOAD_SIZE {
-		return nil, core.ErrPayloadSizeTooLarge
+		return nil, nil, core.ErrPayloadSizeTooLarge
 	}
-	bufPayload := make([]byte, payloadSize)
-	if _, err := io.ReadFull(serverTonnelConn, bufPayload); err != nil {
-		return nil, err
+	bufPayload := buffers.GetBuf(payloadSize)
+	defer bufPayload.Free()
+	if _, err := io.ReadFull(serverTonnelConn, bufPayload.Bytes()); err != nil {
+		return nil, nil, err
 	}
-	frame := append(bufHeader, bufPayload...)
-	return frame, nil
+	frameBuf := buffers.GetBuf(headerSize + payloadSize)
+	// TODO не делать copy, убрать bufPayload, записывать payload сразу в frameBuf
+	copy(frameBuf.Bytes()[:headerSize], bufHeader.Bytes()[:])
+	copy(frameBuf.Bytes()[headerSize:headerSize+payloadSize], bufPayload.Bytes()[:])
+
+	return frameBuf, frameBuf.Bytes()[:headerSize+payloadSize], nil
 }
 
 func CloseConnection(dispatcher core.Dispatcher, requestId core.RequestID) {

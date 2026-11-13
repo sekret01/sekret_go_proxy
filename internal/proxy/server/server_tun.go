@@ -36,7 +36,7 @@ func (s *ServerTun) Start() error {
 		return nil
 	}
 	s.done = make(chan struct{})
-	s.once = &sync.Once{} // TODO-CHECK надо ли
+	s.once = &sync.Once{}
 	s.tunnelEngine.SetLaunch()
 	s.packetDevice.ServerClose()
 	if err := s.packetDevice.CreateTun("tun0"); err != nil {
@@ -232,6 +232,7 @@ func NewServerTun(
 		ipToSession:   make(map[string]*vpnSession),
 		nodeToSession: make(map[*proxy.TunnelNode]*vpnSession),
 		done:          make(chan struct{}),
+		once:          &sync.Once{},
 	}
 }
 

@@ -32,7 +32,7 @@ type TunnelEngine struct {
 	logger          logger.Logger
 	mutex           sync.Mutex
 	clientListeners []ClientListener
-	tunnelMessages  chan core.MessageData
+	tunnelMessages  chan *core.MessageData
 
 	status *proxy.TunnelStatus // Состояние работы
 	ctx    *core.HandshakeContext
@@ -179,21 +179,26 @@ func (t *TunnelEngine) tunnelReader() {
 				t.stopListening(false)
 			}
 			return
-		case frame := <-readChannel:
-			data, msgType, requestId, err := t.framer.Unframe(frame)
+		case tunBuf := <-readChannel:
+			frameBuf := buffers.GetBuf(len(tunBuf.Frame))
+			data, msgType, requestId, err := t.framer.UnframeTo(frameBuf.Bytes(), tunBuf.Frame)
 			if err != nil {
 				t.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
+				frameBuf.Free()
+				tunBuf.Buf.Free()
 				continue
 			}
 			buf := buffers.GetBuf(len(data))
 			decryptData := t.encryptor.DecryptTo(buf.Bytes(), data)
+			frameBuf.Free()
+			tunBuf.Buf.Free()
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
 				Data:      decryptData,
 				Buf:       buf,
 			}
-			t.tunnelMessages <- frameData
+			t.tunnelMessages <- &frameData
 		}
 
 	}
@@ -211,11 +216,11 @@ func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 	encoderBuf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
 	payloadEncode := t.encryptor.EncryptTo(encoderBuf.Bytes(), []byte(payload))
 	frameBuf := buffers.GetBuf(len(payloadEncode) + t.framer.HeaderSize() + core.BYTE_16) // TODO аналогично, решить с длинной
-	frame, err := t.framer.FrameTo(frameBuf.Bytes(), payloadEncode, msgType, requestId)   // frame
+	frame, err := t.framer.FrameTo(frameBuf.Bytes(), payloadEncode, msgType, requestId)
 	encoderBuf.Free()
-	frameBuf.Bytes()
 	if err != nil {
 		t.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
+		frameBuf.Free()
 		return err
 	}
 	t.tunnelNode.Send(frame, frameBuf)
@@ -252,7 +257,7 @@ func NewTunnelEngine(
 		encType:         encType,
 		logger:          logger,
 		clientListeners: make([]ClientListener, 0),
-		tunnelMessages:  make(chan core.MessageData, 1000),
+		tunnelMessages:  make(chan *core.MessageData, 1000),
 		auth:            auth,
 		bootstrap:       bootstrap,
 		done:            make(chan struct{}),
