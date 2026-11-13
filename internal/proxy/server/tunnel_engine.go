@@ -250,7 +250,7 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 				s.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
 				continue
 			}
-			decryptData := tunnelNodeWrapper.Moduls.Encryptor.Decrypt(data)
+			decryptData := tunnelNodeWrapper.Moduls.Encryptor.Decrypt(data) // TODO-EDIT
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
@@ -270,7 +270,7 @@ func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType co
 		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
 			"], msg: [" + utils.BytesToString(payload, 20) + "]"
 	})
-	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.Encrypt([]byte(payload))
+	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.Encrypt([]byte(payload)) // TODO-EDIT
 	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())

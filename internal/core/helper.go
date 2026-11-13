@@ -48,7 +48,7 @@ type SecureConn struct {
 func (s *SecureConn) Write(b []byte) (int, error) {
 	buf := new(bytes.Buffer)
 	data := make([]byte, len(b))
-	data = s.enc.Encrypt(b)
+	data = s.enc.Encrypt(b) // TODO-EDIT
 	payloadLen := uint16(len(data))
 	binary.Write(buf, binary.BigEndian, payloadLen)
 	buf.Write(data)
@@ -68,7 +68,7 @@ func (s *SecureConn) Read(b []byte) (int, error) {
 	if _, err := io.ReadFull(s.Conn, dataBuf); err != nil {
 		return -1, err
 	}
-	decrBytes := s.enc.Decrypt(dataBuf)
+	decrBytes := s.enc.Decrypt(dataBuf) // TODO-EDIT
 	n := len(decrBytes)
 	copy(b, decrBytes)
 	return n, nil

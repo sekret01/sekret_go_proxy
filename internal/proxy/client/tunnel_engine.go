@@ -184,7 +184,7 @@ func (t *TunnelEngine) tunnelReader() {
 				t.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
 				continue
 			}
-			decryptData := t.encryptor.Decrypt(data)
+			decryptData := t.encryptor.Decrypt(data) // TODO-EDIT
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
@@ -205,7 +205,7 @@ func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
 			"], msg: [" + utils.BytesToString(payload, 100) + "]"
 	})
-	payloadEncode := t.encryptor.Encrypt([]byte(payload))
+	payloadEncode := t.encryptor.Encrypt([]byte(payload)) // TODO-EDIT
 	frame, err := t.framer.Frame(payloadEncode, msgType, requestId)
 	if err != nil {
 		t.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
