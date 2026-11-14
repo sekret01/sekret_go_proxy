@@ -139,7 +139,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	ctxGenConnector.SubscribeGenerator(tunnel)
 	return &ClientApp{
 		tunnel:       tunnel,
-		filterServer: filterServer,
+		filterServer: filterServer, // filterServer // TODO-CHECK
 		dnsServer:    dnsServer,
 	}, nil
 }

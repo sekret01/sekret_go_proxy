@@ -159,6 +159,7 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 			})
 			return
 		case msg := <-channel.GetChannel():
+			targetCon.SetWriteDeadline(time.Now().Add(5 * time.Second)) // TODO-CHECK надо ли
 			targetCon.Write(msg.Data)
 			msg.Buf.Free()
 		}
