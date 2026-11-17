@@ -66,7 +66,6 @@ func (b *BaseBuffer) Free() {
 		return
 	}
 	tmp := b.data[:0]
-	clear(tmp)
 	b.pool.pool.Put(&tmp)
 	b.data = nil
 }

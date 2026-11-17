@@ -86,29 +86,25 @@ func NewTunnelStatus() *TunnelStatus {
 
 func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) (core.Buffer, []byte, error) {
 	headerSize := framer.HeaderSize()
-	bufHeader := buffers.GetBuf(headerSize)
-	defer bufHeader.Free()
-	if _, err := io.ReadFull(serverTonnelConn, bufHeader.Bytes()); err != nil {
+	var header [64]byte
+	if _, err := io.ReadFull(serverTonnelConn, header[:headerSize]); err != nil {
 		return nil, nil, err
 	}
-	payloadSize, err := framer.GetPayloadSize(bufHeader.Bytes())
+	payloadSize, err := framer.GetPayloadSize(header[:headerSize]) // bufHeader.Bytes()
 	if err != nil {
 		return nil, nil, err
 	}
 	if payloadSize < 0 || payloadSize > core.MAX_PAYLOAD_SIZE {
 		return nil, nil, core.ErrPayloadSizeTooLarge
 	}
-	bufPayload := buffers.GetBuf(payloadSize)
-	defer bufPayload.Free()
-	if _, err := io.ReadFull(serverTonnelConn, bufPayload.Bytes()); err != nil {
+
+	total := headerSize + payloadSize
+	bufPayload := buffers.GetBuf(total)
+	copy(bufPayload.Bytes()[:headerSize], header[:headerSize])
+	if _, err := io.ReadFull(serverTonnelConn, bufPayload.Bytes()[headerSize:total]); err != nil {
 		return nil, nil, err
 	}
-	frameBuf := buffers.GetBuf(headerSize + payloadSize)
-	// TODO не делать copy, убрать bufPayload, записывать payload сразу в frameBuf
-	copy(frameBuf.Bytes()[:headerSize], bufHeader.Bytes()[:])
-	copy(frameBuf.Bytes()[headerSize:headerSize+payloadSize], bufPayload.Bytes()[:])
-
-	return frameBuf, frameBuf.Bytes()[:headerSize+payloadSize], nil
+	return bufPayload, bufPayload.Bytes()[:total], nil
 }
 
 func CloseConnection(dispatcher core.Dispatcher, requestId core.RequestID) {
