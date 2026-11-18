@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [Unreleased]
+## [1.3.2] 18.11.2026
 
 ### Added
 - Список шагов Handshake отправляются от сервера к клиенту во время Bootstrap (перед Handshake)
