@@ -7,9 +7,10 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
+	clientDns "github.com/sekret01/sekret_go_proxy/internal/dns"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
@@ -17,49 +18,82 @@ import (
 
 // Туннель для единого соединения с сервером
 type ClientProxy struct {
-	tunnelEngin *TunnelEngine
-	detector    core.Detector // Определение протокола
-	dispatcher  core.Dispatcher
-	localAddr   string // Адрес текущего узла
-	logger      logger.Logger
-	listener    net.Listener // Слушатель внешних поключений
+	mainTunnelEngine   *TunnelEngine
+	filterTunnelEngine *TunnelEngine
+	filter             core.Filter
+	detector           core.Detector // Определение протокола
+	dispatcher         core.Dispatcher
+	localAddr          string // Адрес текущего узла
+	logger             logger.Logger
+	listener           net.Listener // Слушатель внешних поключений
+	ipMAp              *clientDns.IPDomainMap
+	connSem            chan struct{}
+	connAttempts       int
 }
 
 func (c *ClientProxy) GetStatus() *proxy.TunnelStatus {
-	return c.tunnelEngin.GetStatus()
+	return c.mainTunnelEngine.GetStatus()
 }
 
 // Запуск соединения между клиентом и удаленным узлом
 func (c *ClientProxy) Start() error {
-	if c.tunnelEngin.IsRunning() {
-		c.logger.Warning("[Start] Trying to start running service, return")
+	go c.startFilterTunnel()
+	return c.startMainTunnel()
+}
+
+func (c *ClientProxy) startMainTunnel() error {
+	if c.mainTunnelEngine.IsRunning() {
+		c.logger.Warning("[startMainTunnel] Trying to start running service, return")
 		return nil
 	}
-	c.tunnelEngin.SetLaunch()
-	for c.tunnelEngin.IsRunning() {
-		err := c.tunnelEngin.ConnectToTunnel()
+	c.mainTunnelEngine.SetLaunch()
+	for c.mainTunnelEngine.IsRunning() {
+		err := c.mainTunnelEngine.ConnectToTunnel()
 		if err != nil {
 			return err
 		}
 
-		c.logger.Info("Start listen on " + c.localAddr)
-		listener, err := c.tunnelEngin.transport.Listen(c.localAddr)
+		c.logger.Info("[startMainTunnel] Start listen on " + c.localAddr)
+		listener, err := c.mainTunnelEngine.transport.Listen(c.localAddr)
 		if err != nil {
-			c.tunnelEngin.SetStopped()
-			c.logger.Error("Tunnel connection error: " + err.Error())
+			c.mainTunnelEngine.SetStopped()
+			c.logger.Error("[startMainTunnel] Tunnel connection error: " + err.Error())
 			return err
 		}
-		go c.listenTunnelMessages()
+		go c.listenTunnelMessages(c.mainTunnelEngine)
 		c.connectionsListener(listener)
-		c.logger.Info("Stop tunnel and connections listening")
+		c.logger.Info("[startMainTunnel] Stop tunnel and connections listening")
+	}
+	return nil
+}
+
+func (c *ClientProxy) startFilterTunnel() error {
+	if c.filterTunnelEngine.IsRunning() {
+		c.logger.Warning("[startFilterTunnel] Trying to start running service, return")
+		return nil
+	}
+	c.filterTunnelEngine.SetLaunch()
+	for c.filterTunnelEngine.IsRunning() {
+		err := c.filterTunnelEngine.ConnectToTunnel()
+		if err != nil {
+			return err
+		}
+		go c.listenTunnelMessages(c.filterTunnelEngine)
+		for c.filterTunnelEngine.IsRunning() {
+			time.Sleep(100 * time.Millisecond) // TODO костыль, заменить на Done()
+		}
 	}
 	return nil
 }
 
 func (c *ClientProxy) Stop() error {
-	res := c.tunnelEngin.stopListening(true)
+	var totalErr error = nil
+	if res := c.mainTunnelEngine.stopListening(true); res != nil {
+		c.logger.Error("[Stop] Stop listening mainTunnelEngine error: " + res.Error())
+		totalErr = res
+	}
 	c.CloseListen()
-	return res
+	return totalErr
 }
 
 func (c *ClientProxy) CloseListen() {
@@ -75,21 +109,37 @@ func (s *ClientProxy) NewHandshakeContext() *core.HandshakeContext {
 
 func (c *ClientProxy) connectionsListener(listener net.Listener) error {
 	c.listener = listener
-	for c.tunnelEngin.IsRunning() {
+	for c.mainTunnelEngine.IsRunning() {
 		requestConn, err := c.listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				c.logger.Info("[connectionsListener] Close listener")
 				return nil
 			}
-			if c.tunnelEngin.IsRunning() {
+			if c.mainTunnelEngine.IsRunning() {
 				continue
 			} else {
 				c.logger.Info("[connectionsListener] Close listener (" + err.Error() + ")")
 				return err
 			}
 		}
-		go c.newConnectionHandler(requestConn)
+		select {
+		case c.connSem <- struct{}{}:
+			go func() {
+				c.connAttempts = 0
+				defer func() { <-c.connSem }()
+				c.newConnectionHandler(requestConn)
+			}()
+		default:
+			c.connAttempts++
+			switch c.connAttempts {
+			case 100:
+				c.logger.Warning("[connectionsListener] Can not accept conn, limit reached (100+ consecutive attempts)")
+			case 1000:
+				c.logger.Critical("[connectionsListener] Can not accept conn, limit reached (1000+ consecutive attempts)")
+			}
+			requestConn.Close()
+		}
 	}
 	return nil
 }
@@ -97,21 +147,24 @@ func (c *ClientProxy) connectionsListener(listener net.Listener) error {
 // Обработка новых входящих запросов
 // Чтение - получение протокола - шифрование - оборачивание в пакет - отправление
 func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
-	if !c.tunnelEngin.IsRunning() {
+	if !c.mainTunnelEngine.IsRunning() {
 		return
 	}
-	c.logger.Debug("New connection: " + requestConn.RemoteAddr().String())
+	c.logger.Debug("[newConnectionHandler] New connection: " + requestConn.RemoteAddr().String())
 
+	requestConn.SetDeadline(time.Now().Add(10 * time.Second))
 	reader := bufio.NewReader(requestConn)
 	data, err := reader.ReadString('\n')
 	if err != nil {
 		if err != io.EOF {
-			c.logger.Error("Error in read data: " + err.Error())
+			c.logger.Error("[newConnectionHandler] Error in read data: " + err.Error())
 		}
 		requestConn.Close()
 		return
 	}
-	c.logger.Debug("Get data: " + utils.BytesToString([]byte(data), 20))
+	c.logger.Debugf(func() string {
+		return "[newConnectionHandler] Get data: " + utils.BytesToString([]byte(data), 20)
+	})
 
 	reader = bufio.NewReader(io.MultiReader(bytes.NewReader([]byte(data)), reader))
 
@@ -125,30 +178,31 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 
 	proto, err := c.detector.Detect([]byte(data[:prefixSize]))
 	if err != nil {
-		c.logger.Error("Can not detect protocol: " + err.Error())
+		c.logger.Error("[newConnectionHandler] Can not detect protocol: " + err.Error())
 		requestConn.Close()
 		return
 	}
+	requestConn.SetDeadline(time.Time{})
 	c.switchProtocol(proto, requestConn, reader)
 }
 
 func (c *ClientProxy) switchProtocol(proto core.ProtocolType, requestConn net.Conn, reader *bufio.Reader) {
 	switch proto {
 	case core.ProtoUnknown:
-		c.logger.Debug("Get uncknown protocol, close")
+		c.logger.Debug("[switchProtocol Get uncknown protocol, close, " + requestConn.RemoteAddr().String())
 		requestConn.Close()
 		return
 	case core.ProtoSOCKS5:
-		c.logger.Debug("Get SOCKS5 protocol, close")
+		c.logger.Debug("[switchProtocol Get SOCKS5 protocol, close " + requestConn.RemoteAddr().String())
 		requestConn.Close()
 		return
 	case core.ProtoHTTP:
-		c.logger.Debug("Get HTTP protocol, handle")
+		c.logger.Debug("[switchProtocol Get HTTP protocol, handle " + requestConn.RemoteAddr().String())
 		c.handlerHttpProto(reader, requestConn)
 		requestConn.Close()
 		return
 	default:
-		c.logger.Debug("Protocol not found, close")
+		c.logger.Debug("[switchProtocol Protocol not found, close " + requestConn.RemoteAddr().String())
 		return
 	}
 }
@@ -156,102 +210,130 @@ func (c *ClientProxy) switchProtocol(proto core.ProtocolType, requestConn net.Co
 func (c *ClientProxy) handlerHttpProto(reader *bufio.Reader, requestConn net.Conn) {
 	headerFirstString, err := reader.ReadString('\n')
 	if err != nil {
-		c.logger.Error("[handlerHttpProto] Error in read data: " + err.Error())
+		c.logger.Error("[handlerHttpProto] Error [ " + requestConn.RemoteAddr().String() + " ] in read data: " + err.Error())
 		requestConn.Close()
 		return
 	}
-	c.logger.Debug("[handlerHttpProto] get header: \n" + strings.Trim(string(headerFirstString), " \n"))
 
 	parsedHeaderFirstString := strings.Fields(headerFirstString)
+	if len(parsedHeaderFirstString) < 2 {
+		c.logger.Debug("[handlerHttpProto] Error: [ " + requestConn.RemoteAddr().String() + " ] header has not method or target: " + headerFirstString)
+		requestConn.Close()
+		return
+	}
 	method := parsedHeaderFirstString[0]
 	target := parsedHeaderFirstString[1]
 
 	if method == "CONNECT" {
+		host, _, err := net.SplitHostPort(target)
+		if err != nil {
+			c.logger.Debug("[handlerHttpProto]: from:[ " + requestConn.RemoteAddr().String() + " ] Target str " + host + " not ip")
+			host = target
+		}
+		filter := false
+
+		if ip := net.ParseIP(host); ip != nil {
+			if c.ipMAp != nil {
+				if domain, ok := c.ipMAp.Get(host); ok {
+					if c.filter.Check(domain) {
+						filter = true
+					}
+				}
+			}
+		} else {
+			filter = c.filter.Check(host)
+		}
+
 		requestConn.Write([]byte(core.HttpConnectResponse))
-		c.handleTunnelConnect(requestConn, target)
+		c.handleTunnelConnect(requestConn, target, filter)
 		return
 	} else {
 		requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, false)
 		prepTarget := strings.Replace(target, "http://", "", 1)
 		prepTarget = prepTarget[:len(prepTarget)-1] + ":80"
-		c.tunnelEngin.sendIntoTunnel(requestId, core.MsgConnect, []byte(prepTarget))
+		filter := c.filter.Check(prepTarget)
+		c.distributeTunnelAndSend(requestId, core.MsgConnect, []byte(prepTarget), filter)
 
-		buf := make([]byte, 32*1024)
+		buf := make([]byte, 16*1024)
 		n, _ := reader.Read(buf)
-		c.logger.Debug("Get http buf: " + utils.BytesToString(buf, 20))
+		c.logger.Debugf(func() string {
+			return "[handlerHttpProto]:  from: [ " + requestConn.RemoteAddr().String() + " ] Get http buf: " + utils.BytesToString(buf, 20)
+		})
 
-		c.tunnelEngin.sendIntoTunnel(requestId, core.MsgData, append([]byte(headerFirstString), buf[:n]...))
+		c.distributeTunnelAndSend(requestId, core.MsgData, append([]byte(headerFirstString), buf[:n]...), filter)
 		return
 	}
 }
 
-// Отрпавление запроса на подключение сервером к targetHost при HTTPS запросе
-func (c *ClientProxy) handleTunnelConnect(requestConn net.Conn, targetHost string) {
+func (c *ClientProxy) handleTunnelConnect(requestConn net.Conn, targetHost string, filter bool) {
 	c.logger.Debug("[handleTunnelConnect] Start handle for " + targetHost)
 	requestId := c.generateAndRegistrateId(requestConn, core.ProtoHTTP, true)
-	err := c.tunnelEngin.sendIntoTunnel(requestId, core.MsgConnect, []byte(targetHost))
+	err := c.distributeTunnelAndSend(requestId, core.MsgConnect, []byte(targetHost), filter)
 	if err != nil {
 		requestConn.Close()
 		c.dispatcher.Delete(requestId)
 		return
 	}
-	c.listenFromClientForTunnel(requestId, requestConn)
+	c.listenFromClientForTunnel(requestId, requestConn, filter)
 }
 
 // Цикличное чтение данных с клиента (при HTTPS)
-func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, requestConn net.Conn) {
+func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, requestConn net.Conn, filter bool) {
 	defer requestConn.Close()
 	defer c.dispatcher.Delete(requestId)
 
-	buf := make([]byte, 32*1024)
-	for c.tunnelEngin.IsRunning() {
+	buf := make([]byte, 16*1024)
+	requestConn.SetDeadline(time.Now().Add(20 * time.Second))
+	for c.mainTunnelEngine.IsRunning() {
 		size, err := requestConn.Read(buf)
 		if err != nil {
-			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
-			c.tunnelEngin.sendCloseIntoTunnel(requestId)
+			c.logger.Debug("[listenFromClientForTunnel] Client [ " + utils.RequestIdToString(requestId) + " ] disconnect with error: " + err.Error())
+			c.distributeTunnelAndSendClose(requestId, filter)
 			return
 		}
 		if size == 0 {
-			c.logger.Debug("Client [ " + utils.RequestIdToString(requestId) + " ] disconnect")
-			c.tunnelEngin.sendCloseIntoTunnel(requestId)
+			c.logger.Debug("[listenFromClientForTunnel] Client [ " + utils.RequestIdToString(requestId) + " ] disconnect")
+			c.distributeTunnelAndSendClose(requestId, filter)
 			return
 		}
-		c.tunnelEngin.sendIntoTunnel(requestId, core.MsgData, buf[:size])
+		c.distributeTunnelAndSend(requestId, core.MsgData, buf[:size], filter)
 	}
 }
 
-func (c *ClientProxy) listenTunnelMessages() {
-	for msg := range c.tunnelEngin.tunnelMessages {
-		conWrapper, ok := c.dispatcher.Find(msg.RequestId)
-		requestCon := conWrapper.Conn
-		if !ok {
-			c.logger.Debug("[tunnelReader] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
-			continue
-		}
-		c.logger.Debug("[tunnelReader] Get data [ " + utils.RequestIdToString(msg.RequestId) + " ], msg_type: " + utils.MessageTypeToHexString(msg.MsgType))
-		switch msg.MsgType {
-		case core.MsgData:
-			n := 10
-			if len(msg.Data) < n {
-				n = len(msg.Data)
+func (c *ClientProxy) listenTunnelMessages(tunnelEngine *TunnelEngine) {
+	for {
+		select {
+		case <-tunnelEngine.Done():
+			c.logger.Info("[listenTunnelMessages] get Done from tunnel, exit listen")
+			return
+		case msg := <-tunnelEngine.tunnelMessages:
+			conWrapper, ok := c.dispatcher.Find(msg.RequestId)
+			if !ok {
+				msg.Buf.Free()
+				c.logger.Debug("[listenTunnelMessages] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+				continue
 			}
-			c.logger.Debug("[tunnelReader] send data [" + utils.BytesToString(msg.Data, 20) + "...]")
-			requestCon.Write(msg.Data)
-			if !conWrapper.IsTunnel {
-				dataStr := string(msg.Data)
-				if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
-					strings.Contains(dataStr, "Connection: close") {
-					c.logger.Debug("[tunnelReader] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(msg.RequestId) + "]")
-					c.tunnelEngin.sendCloseIntoTunnel(msg.RequestId)
-					proxy.CloseConnection(c.dispatcher, msg.RequestId)
-				}
+			requestCon := conWrapper.Conn
+			switch msg.MsgType {
+			case core.MsgData:
+				requestCon.Write(msg.Data)
+				if !conWrapper.IsTunnel {
+					dataStr := string(msg.Data)
+					if strings.HasSuffix(dataStr, "0\r\n\r\n") ||
+						strings.Contains(dataStr, "Connection: close") {
+						c.logger.Debug("[listenTunnelMessages] close not tunnel and not keep-alive connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+						tunnelEngine.sendCloseIntoTunnel(msg.RequestId)
+						proxy.CloseConnection(c.dispatcher, msg.RequestId)
+					}
 
+				}
+			case core.MsgClose:
+				proxy.CloseConnection(c.dispatcher, msg.RequestId)
+			case core.MsgError:
+				requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+				proxy.CloseConnection(c.dispatcher, msg.RequestId)
 			}
-		case core.MsgClose:
-			proxy.CloseConnection(c.dispatcher, msg.RequestId)
-		case core.MsgError:
-			requestCon.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			proxy.CloseConnection(c.dispatcher, msg.RequestId)
+			msg.Buf.Free()
 		}
 	}
 }
@@ -259,25 +341,49 @@ func (c *ClientProxy) listenTunnelMessages() {
 func (c *ClientProxy) generateAndRegistrateId(requestConn net.Conn, protoType core.ProtocolType, isTunnel bool) core.RequestID {
 	requestId := core.GenerateID()
 	c.dispatcher.Register(requestId, requestConn, protoType, isTunnel)
-	c.logger.Debug("Save conn with UUID " + utils.RequestIdToString(requestId))
+	c.logger.Debug("[generateAndRegistrateId Save conn [ " + requestConn.RemoteAddr().String() + " ]  with UUID " + utils.RequestIdToString(requestId))
 	return requestId
 }
 
+func (c *ClientProxy) distributeTunnelAndSend(requestId core.RequestID, msgType core.MessageType, payload []byte, filter bool) error {
+	if !filter {
+		return c.mainTunnelEngine.sendIntoTunnel(requestId, msgType, payload)
+	}
+	return c.filterTunnelEngine.sendIntoTunnel(requestId, msgType, payload)
+}
+
+func (c *ClientProxy) distributeTunnelAndSendClose(requestId core.RequestID, filter bool) {
+	if filter {
+		c.filterTunnelEngine.sendCloseIntoTunnel(requestId)
+	} else {
+		c.mainTunnelEngine.sendCloseIntoTunnel(requestId)
+	}
+}
+
 func NewClientProxy(
-	tunnelEngin *TunnelEngine,
+	mainTunnelEngine *TunnelEngine,
+	filterTunnelEngine *TunnelEngine,
+	filter core.Filter,
 	detector core.Detector,
 	dispatcher core.Dispatcher,
-	cfg *config.Config,
+	localAddr string,
 	logger logger.Logger,
+	ipMAp *clientDns.IPDomainMap,
+	connectionLimit int,
 ) *ClientProxy {
 	client := &ClientProxy{
-		tunnelEngin: tunnelEngin,
-		detector:    detector,
-		dispatcher:  dispatcher,
-		localAddr:   cfg.LocalHost,
-		logger:      logger,
-		listener:    nil,
+		mainTunnelEngine:   mainTunnelEngine,
+		filterTunnelEngine: filterTunnelEngine,
+		filter:             filter,
+		detector:           detector,
+		dispatcher:         dispatcher,
+		localAddr:          localAddr,
+		logger:             logger,
+		listener:           nil,
+		ipMAp:              ipMAp,
+		connSem:            make(chan struct{}, connectionLimit),
+		connAttempts:       0,
 	}
-	tunnelEngin.RegistrateListener(client)
+	mainTunnelEngine.RegistrateListener(client)
 	return client
 }

@@ -1,7 +1,6 @@
 package defaultencryptorgo
 
 import (
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 )
@@ -9,15 +8,18 @@ import (
 // Заглушка, для быстрой проверки логики работы системы
 type DefaultEncryptor struct{}
 
-func (m *DefaultEncryptor) Encrypt(data []byte) []byte {
-	return data
+func (m *DefaultEncryptor) Encrypt(data []byte) []byte { return data }
+func (m *DefaultEncryptor) Decrypt(data []byte) []byte { return data }
+func (m *DefaultEncryptor) EncryptTo(dst, data []byte) []byte {
+	copy(dst, data)
+	return dst[:len(data)]
+}
+func (m *DefaultEncryptor) DecryptTo(dst, data []byte) []byte {
+	copy(dst, data)
+	return dst[:len(data)]
 }
 
-func (m *DefaultEncryptor) Decrypt(data []byte) []byte {
-	return data
-}
-
-func NewDefaultEncryptor(key []byte, config *config.Config) (core.Encryptor, error) {
+func NewDefaultEncryptor(key []byte) (core.Encryptor, error) {
 	return &DefaultEncryptor{}, nil
 }
 

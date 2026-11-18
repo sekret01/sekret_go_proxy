@@ -3,11 +3,10 @@ package framers
 import (
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-type FactoryFunc func(*config.Config) (core.Framer, error)
+type FactoryFunc func() (core.Framer, error)
 
 var (
 	framesMap = make(map[string]FactoryFunc)
@@ -33,12 +32,12 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewFramer(cfg *config.Config) (core.Framer, error) {
-	factory, err := get(cfg.FramerType)
+func NewFramer(name string) (core.Framer, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}
-	return factory(cfg)
+	return factory()
 }
 
 func List() []string {

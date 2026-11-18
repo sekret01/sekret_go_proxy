@@ -1,14 +1,12 @@
 package dispatchers
 
 import (
-	"fmt"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-type factoryFunc func(config *config.Config) (core.Dispatcher, error)
+type factoryFunc func() (core.Dispatcher, error)
 
 var (
 	dispatchersMap = make(map[string]factoryFunc)
@@ -22,7 +20,6 @@ func Register(key string, factory factoryFunc) {
 		panic("Encryption [" + key + "] already exists")
 	}
 	dispatchersMap[key] = factory
-	fmt.Printf("Dispatcher [%s] has been registrated\n", key)
 }
 
 func get(key string) (factoryFunc, error) {
@@ -35,12 +32,12 @@ func get(key string) (factoryFunc, error) {
 	return encr, nil
 }
 
-func NewDispatcher(config *config.Config) (core.Dispatcher, error) {
-	factory, err := get(config.DispatcherType)
+func NewDispatcher(name string) (core.Dispatcher, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}
-	return factory(config)
+	return factory()
 }
 
 func List() []string {

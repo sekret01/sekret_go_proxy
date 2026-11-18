@@ -2,16 +2,43 @@ package config
 
 type Config struct {
 	ConnectionConfig `yaml:"connection"`
+	FilterConfig     `yaml:"filter"`
 	ModuleConfig     `yaml:"modules"`
 	LogConfig        `yaml:"logs"`
 	AdminConfig      `yaml:"admin"`
 	VPN              `yaml:"vpn"`
+	DnsConfig        `yaml:"dns"`
 }
 
 type ConnectionConfig struct {
 	ConnectionType string `yaml:"connection_type"`
 	LocalHost      string `yaml:"localhost"`
 	RemoteHost     string `yaml:"remotehost"`
+	PprofHost      string `yaml:"pprofhost"`
+	ConnLimit      int    `yaml:"connection_limit"`
+}
+
+type FilterConfig struct {
+	FilterActive    bool               `yaml:"active"`
+	FilterType      string             `yaml:"filter_type"`
+	FilterAddresses []string           `yaml:"addresses"`
+	FilterDomain    string             `yaml:"domain"`
+	FilterServer    FilterServerConfig `yaml:"server"`
+}
+
+type FilterServerConfig struct {
+	Host       string `yaml:"host"`
+	Transport  string `yaml:"transport"`
+	Framer     string `yaml:"framer"`
+	Encryptor  string `yaml:"encryptor"`
+	Dispatcher string `yaml:"dispatcher"`
+	Auth       string `yaml:"auth"`
+}
+
+type DnsConfig struct {
+	DnsActive   bool   `yaml:"active"`
+	DnsHost     string `yaml:"host"`
+	DnsUpstream string `yaml:"upstream"`
 }
 
 type ModuleConfig struct {

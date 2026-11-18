@@ -1,15 +1,12 @@
 package handshake
 
 import (
-	"fmt"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
-	"github.com/sekret01/sekret_go_proxy/internal/handshake/bootstrap"
 )
 
-type FactoryFunc func(*config.Config) (core.HandshakeStep, error)
+type FactoryFunc func() (core.HandshakeStep, error)
 
 var (
 	framesMap = make(map[string]FactoryFunc)
@@ -23,7 +20,6 @@ func Registrate(key string, factory FactoryFunc) {
 		panic("Framer [" + key + "] already exists")
 	}
 	framesMap[key] = factory
-	fmt.Printf("HandshakeStep [%s] has been registrated\n", key)
 }
 
 func get(key string) (FactoryFunc, error) {
@@ -31,21 +27,17 @@ func get(key string) (FactoryFunc, error) {
 	defer mu.RUnlock()
 	val, exist := framesMap[key]
 	if !exist {
-		return nil, core.ErrInvalidTransportKey
+		return nil, core.ErrInvalidHandshakeStepKey
 	}
 	return val, nil
 }
 
-func NewHandshake(cfg *config.Config, name string) (core.HandshakeStep, error) {
+func NewHandshake(name string) (core.HandshakeStep, error) {
 	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}
-	return factory(cfg)
-}
-
-func NewBootstrap(cfg config.Config) core.Bootstrap {
-	return bootstrap.NewBaseBootstrap()
+	return factory()
 }
 
 func List() []string {

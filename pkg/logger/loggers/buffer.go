@@ -15,6 +15,8 @@ type BufferLogger struct {
 }
 
 func (l *BufferLogger) Log(lvl logger.LoggerLevel, msg string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if len(l.buffer) > 1 && l.buffer[len(l.buffer)-1].Message == msg {
 		l.buffer[len(l.buffer)-1].Count++
 		return
@@ -26,10 +28,12 @@ func (l *BufferLogger) Log(lvl logger.LoggerLevel, msg string) {
 		Message: msg,
 		Count:   1,
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.buffer = append(l.buffer, newLog)
 	l.validateLen()
+}
+
+func (l *BufferLogger) Logf(lvl logger.LoggerLevel, lazy func() string) {
+	l.Log(lvl, lazy())
 }
 
 func (l *BufferLogger) GetLogs() []logger.LogMessage {
@@ -48,6 +52,8 @@ func (l *BufferLogger) Info(msg string)     { l.Log(logger.INFO, msg) }
 func (l *BufferLogger) Warning(msg string)  { l.Log(logger.WARNING, msg) }
 func (l *BufferLogger) Error(msg string)    { l.Log(logger.ERROR, msg) }
 func (l *BufferLogger) Critical(msg string) { l.Log(logger.CRITICAL, msg) }
+
+func (l *BufferLogger) Debugf(lazy func() string) { l.Logf(logger.DEBUG, lazy) }
 
 func (l *BufferLogger) validateLen() {
 	if len(l.buffer) > l.maxLen {

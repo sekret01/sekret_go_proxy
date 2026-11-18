@@ -6,7 +6,7 @@ type Hub struct {
 	loggers []Logger
 	buffer  LogBuffer
 	level   LoggerLevel
-	mu      sync.Mutex
+	mu      sync.RWMutex
 }
 
 func (h *Hub) Registrate(logger Logger) {
@@ -40,11 +40,27 @@ func (h *Hub) WithModule(module string) Logger {
 }
 
 func (h *Hub) Log(lvl LoggerLevel, msg string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if lvl >= h.level {
-		for _, logger := range h.loggers {
+	h.mu.RLock()
+	curLvl := h.level
+	loggersCopy := make([]Logger, len(h.loggers))
+	copy(loggersCopy, h.loggers)
+	h.mu.RUnlock()
+	if lvl >= curLvl {
+		for _, logger := range loggersCopy {
 			logger.Log(lvl, msg)
+		}
+	}
+}
+
+func (h *Hub) Logf(lvl LoggerLevel, lazy func() string) {
+	h.mu.RLock()
+	curLvl := h.level
+	loggersCopy := make([]Logger, len(h.loggers))
+	copy(loggersCopy, h.loggers)
+	h.mu.RUnlock()
+	if lvl >= curLvl {
+		for _, logger := range loggersCopy {
+			logger.Log(lvl, lazy())
 		}
 	}
 }
@@ -54,6 +70,8 @@ func (h *Hub) Info(msg string)     { h.Log(INFO, msg) }
 func (h *Hub) Warning(msg string)  { h.Log(WARNING, msg) }
 func (h *Hub) Error(msg string)    { h.Log(ERROR, msg) }
 func (h *Hub) Critical(msg string) { h.Log(CRITICAL, msg) }
+
+func (h *Hub) Debugf(lazy func() string) { h.Logf(DEBUG, lazy) }
 
 var hub *Hub = nil
 

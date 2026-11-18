@@ -32,6 +32,7 @@ func main() {
 	hub.Info("START LOAD CONFIG")
 	cfg := loadConfig(hub)
 	setLoggerConfig(hub, cfg)
+	utils.RunPprof(cfg.PprofHost)
 
 	printRegistrates(hub)
 
@@ -52,7 +53,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	hub.Info("shutdown signal")
+	hub.Info("SHUTDOWN SIGNAL")
 	admin.Stop(ctx)
 }
 
@@ -69,10 +70,10 @@ func setupLogger() logger.LoggerHub {
 	hub := logger.GetLoggerHub()
 	consoleLogger := loggers.NewConsoleLogger()
 	bufferLogger := loggers.NewBufferLogger()
-	// fileLogger := loggers.NewFileLogger()
+	fileLogger := loggers.NewFileLogger()
 	hub.Registrate(consoleLogger)
 	hub.Registrate(bufferLogger)
-	// hub.Registrate(fileLogger)
+	hub.Registrate(fileLogger)
 	hub.RegisterBuffer(bufferLogger)
 	hub.SetLevel(logger.INFO)
 	return hub
@@ -110,7 +111,7 @@ func buildServerApp(hub logger.LoggerHub, cfg *config.Config) (webadmin.Controll
 func buildServerProxyApp(hub logger.LoggerHub, cfg *config.Config) *app.ServerApp {
 	server, err := app.NewServerApp(cfg)
 	if err != nil {
-		hub.Critical("[buildServerApp]: " + err.Error())
+		hub.Critical("[buildServerProxyApp]: " + err.Error())
 		criticalExit()
 	}
 	return server

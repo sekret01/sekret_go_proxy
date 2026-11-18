@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -12,7 +13,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type chanMap map[core.RequestID]*proxy.SafeChannel
+type chanMap map[core.RequestID]*proxy.SafeMessageChannel
 
 type ServerProxy struct {
 	tunnelEngine *ServerTunnelEngine
@@ -52,7 +53,7 @@ func (s *ServerProxy) GetUsers() []string {
 }
 
 func (s *ServerProxy) NewHandshakeContext() *core.HandshakeContext {
-	ctx := &core.HandshakeContext{} // TODO добавить генерацию 32b ключа
+	ctx := &core.HandshakeContext{}
 	encKey := utils.Generate32ByteKey()
 	ctx.EncryptorKey = encKey
 	return ctx
@@ -77,32 +78,41 @@ func (s *ServerProxy) TunnelReaderHandler(tunWrapper TunnelNodeWrapper) {
 			switch msg.MsgType {
 			case core.MsgPacket:
 				s.logger.Info("Packet get")
+				msg.Buf.Free()
 			case core.MsgConnect:
 				s.connectAndRegistrate(msg.RequestId, msg.Data, &tunWrapper)
+				msg.Buf.Free()
 			case core.MsgData:
-				s.putMessageIntoChannel(msg.RequestId, msg.Data)
+				s.putMessageIntoChannel(msg.RequestId, &msg)
 			case core.MsgClose:
 				s.closeChannel(msg.RequestId)
 				conWrapper, ok := s.dispatcher.Find(msg.RequestId)
 				s.logger.Debug("[TunnelReaderHandler] Get close message [" + utils.RequestIdToString(msg.RequestId) + "]")
 				if !ok {
 					s.logger.Debug("[TunnelReaderHandler] ERROR: not found connection [" + utils.RequestIdToString(msg.RequestId) + "]")
+					msg.Buf.Free()
 					continue
 				}
 				conWrapper.Conn.Close()
 				proxy.CloseConnection(s.dispatcher, msg.RequestId)
+				msg.Buf.Free()
 			}
 		}
 	}
 }
 
-func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeChannel {
+func (s *ServerProxy) getOrCreateChannel(requestId core.RequestID) *proxy.SafeMessageChannel {
 	s.chanMutex.Lock()
-	defer s.chanMutex.Unlock()
 	if ch, ex := s.connChannels[requestId]; ex {
+		s.chanMutex.Unlock()
 		return ch
 	}
-	ch := proxy.NewSafeChannel()
+	s.chanMutex.Unlock()
+
+	ch := proxy.NewSafeMessageChannel()
+
+	s.chanMutex.Lock()
+	defer s.chanMutex.Unlock()
 	s.connChannels[requestId] = ch
 	return ch
 }
@@ -112,9 +122,11 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 	go func() {
 		targetCon, err := s.tunnelEngine.transport.Dial(string(decryptData))
 		if err != nil {
-			s.logger.Debug("[connectAndRegistrate] Can not connect to target server [" + utils.BytesToString(decryptData, 20) + "] " + err.Error())
+			s.logger.Debugf(func() string {
+				return "[connectAndRegistrate] Can not connect to target server [" + utils.BytesToString(decryptData, 20) + "] " + err.Error()
+			})
 			s.closeChannel(requestId)
-			s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper) // TODO добавить сообщения ошибок
+			s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper)
 			return
 		}
 		s.dispatcher.Register(requestId, targetCon, core.ProtoTest, true)
@@ -123,30 +135,33 @@ func (s *ServerProxy) connectAndRegistrate(requestId core.RequestID, decryptData
 	}()
 }
 
-func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, decryptData []byte) {
+func (s *ServerProxy) putMessageIntoChannel(requestId core.RequestID, msg *core.MessageData) {
 	s.chanMutex.RLock()
 	safeChannel, ex := s.connChannels[requestId]
 	s.chanMutex.RUnlock()
 	if !ex {
+		msg.Buf.Free()
 		return
 	}
-	if ok := safeChannel.Put(decryptData); ok {
-		s.logger.Debug("[putMessageIntoChannel] put new message [" + utils.RequestIdToString(requestId) + "] ")
-	} else {
+	if ok := safeChannel.Put(msg); !ok {
+		msg.Buf.Free()
 		s.logger.Debug("[putMessageIntoChannel] WARNING cannot put msg [" + utils.RequestIdToString(requestId) + "] into channel")
 	}
 }
 
-func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.SafeChannel, targetCon net.Conn) {
+func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.SafeMessageChannel, targetCon net.Conn) {
 	s.logger.Debug("[conChannelReader] start read chan for [" + utils.RequestIdToString(requestId) + " ]")
 	for {
 		select {
 		case <-channel.Done():
-			s.logger.Debug("[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "] ")
+			s.logger.Debugf(func() string {
+				return "[conChannelReader] finish chan chan for [" + utils.RequestIdToString(requestId) + "]"
+			})
 			return
-		case data := <-channel.GetChannel():
-			s.logger.Debug("[conChannelReader] send data [" + utils.BytesToString(data, 20) + "...]")
-			targetCon.Write(data)
+		case msg := <-channel.GetChannel():
+			targetCon.SetWriteDeadline(time.Now().Add(5 * time.Second)) // TODO-CHECK надо ли
+			targetCon.Write(msg.Data)
+			msg.Buf.Free()
 		}
 	}
 }
@@ -154,28 +169,34 @@ func (s *ServerProxy) conChannelReader(requestId core.RequestID, channel *proxy.
 func (s *ServerProxy) targetConnectinoHandler(requestId core.RequestID, targetCon net.Conn, tunnelNodeWrapper *TunnelNodeWrapper) {
 	s.logger.Debug("[targetConnectinoHandler] Create new connection: " + targetCon.RemoteAddr().String())
 	defer func() {
+		targetCon.Close()
 		s.tunnelEngine.sendCloseIntoTunnel(requestId, tunnelNodeWrapper)
 		s.closeChannel(requestId)
 		proxy.CloseConnection(s.dispatcher, requestId)
 
 	}()
 
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, 16*1024)
 	for {
 		select {
 		case <-tunnelNodeWrapper.Node().GetWriteChan().Done():
-			s.logger.Debug("[targetConnectinoHandler] Tunnel is closed, exit targetConnectinoHandler")
+			s.logger.Debug("[targetConnectinoHandler] Tunnel is closed, exit targetConnectinoHandler [" + utils.RequestIdToString(requestId) + "]")
 			return
 		default:
+			targetCon.SetDeadline(time.Now().Add(10 * time.Second))
 			size, err := targetCon.Read(buf)
 			if err != nil {
+				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					s.logger.Debug("[targetConnectinoHandler] Target [" + utils.RequestIdToString(requestId) + "]  disconnect with timeout")
+					return
+				}
 				if !(errors.Is(err, net.ErrClosed) || err == io.EOF) {
-					s.logger.Debug("[targetConnectinoHandler] Client disconnect with error: " + err.Error())
+					s.logger.Debug("[targetConnectinoHandler] Target [" + utils.RequestIdToString(requestId) + "]  disconnect with error: " + err.Error())
 				}
 				return
 			}
 			if size == 0 {
-				s.logger.Debug("[targetConnectinoHandler] Client disconnect with data size 0")
+				s.logger.Debug("[targetConnectinoHandler] Target [" + utils.RequestIdToString(requestId) + "] disconnect with data size 0")
 				return
 			}
 			s.tunnelEngine.sendIntoTunnel(requestId, core.MsgData, buf[:size], tunnelNodeWrapper)

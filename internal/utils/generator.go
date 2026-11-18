@@ -11,3 +11,10 @@ func Generate32ByteKey() []byte {
 	}
 	return key
 }
+
+func GetByteBuffer(size int) ([]byte, error) {
+	if size < 0 {
+		return make([]byte, 0), BufferSizeError
+	}
+	return make([]byte, size), nil
+}

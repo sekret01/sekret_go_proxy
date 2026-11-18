@@ -36,6 +36,16 @@ type Auth interface {
 }
 ```
 
+### Шаг handshake
+
+```go
+type HandshakeStep interface {
+	Name() string
+	ClientSide(ctx *HandshakeContext, conn net.Conn) error
+	ServerSide(ctx *HandshakeContext, conn net.Conn) error
+}
+```
+
 ### Шифрование (internal/core/encription.go)
 
 ```go
@@ -70,8 +80,9 @@ type Transport interface {
 
 |пакет модулей|описание|доступные модули по умолчанию|
 |-|-|-|
-|**transport_type**|тип транспортного уровня для туннеля|tcp, udp|
+|**transport_type**|тип транспортного уровня для туннеля|tcp|
 |**encryptor_type**|тип шифровальщика|default, chacha20|
 |**framer_type**|тип фреймера протокола|default|
 |**dispatcher_type**|тип диспетчера|default|
 |**auth_type**|тип авторизации и аутентификации|default, composite_handshake|
+|**handshake_steps**|список шагов для handshake|ip, enckey|

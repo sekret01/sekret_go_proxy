@@ -1,7 +1,27 @@
 connection:
   connection_type: proxy
-  localhost: 127.0.0.1:15985
+  localhost: :15985
   remotehost: 
+  pprofhost: :6060
+  connection_limit: 2048
+
+filter:
+  active: true
+  filter_type: default
+  addresses: []
+  domain: ru
+  server:
+    host: 127.0.0.1:35785
+    transport: tcp
+    framer: default
+    encryptor: default
+    dispatcher: default
+    auth: default
+
+dns:
+  active: true
+  host: :5353
+  upstream: 8.8.8.8:53
 
 modules:
   transport_type: tcp
@@ -9,13 +29,12 @@ modules:
   framer_type: default
   dispatcher_type: default
   auth_type: composite_handshake
-  handshake_steps: [enckey]
 
 logs:
   log_level: INFO
 
 admin:
-  adminhost: 127.0.0.1:12345
+  adminhost: :12345
   authentication: none
   user: 
   password: 

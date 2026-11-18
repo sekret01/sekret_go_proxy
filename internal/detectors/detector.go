@@ -9,6 +9,9 @@ import (
 type Detector struct{}
 
 func (d *Detector) Detect(data []byte) (core.ProtocolType, error) {
+	if len(data) == 0 {
+		return core.ProtoUnknown, nil
+	}
 	if data[0] == 0x05 {
 		return core.ProtoSOCKS5, nil
 	} else if bytes.HasPrefix(data, []byte("CONNECT")) ||

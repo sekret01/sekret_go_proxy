@@ -4,15 +4,14 @@ import (
 	"errors"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type TunnelNode struct {
-	tunnelReadChan   *SafeChannel
-	tunnelWriteChan  *SafeChannel
+	tunnelReadChan   *SafeBufferChannel
+	tunnelWriteChan  *SafeBufferChannel
 	framer           core.Framer
 	connMut          sync.Mutex
 	remoteTunnelNode net.Conn
@@ -44,27 +43,30 @@ func (t *TunnelNode) Done() chan struct{} {
 	return t.done
 }
 
-func (t *TunnelNode) GetReadChan() *SafeChannel {
-	t.logger.Debug("[GetReadChan] Read chan taken")
+func (t *TunnelNode) GetReadChan() *SafeBufferChannel {
 	return t.tunnelReadChan
 }
 
-func (t *TunnelNode) GetWriteChan() *SafeChannel {
-	t.logger.Debug("[GetWriteChan] Write chan taken")
+func (t *TunnelNode) GetWriteChan() *SafeBufferChannel {
 	return t.tunnelWriteChan
 }
 
-func (t *TunnelNode) Send(frame []byte) error {
+func (t *TunnelNode) Send(frame []byte, buf core.Buffer) error {
 	select {
 	case <-t.done:
+		if buf != nil {
+			buf.Free()
+		}
 		t.logger.Debug("[Send] Tunnel is close, exit")
 		return nil
 	default:
-		if !t.tunnelWriteChan.Put(frame) {
+		if !t.tunnelWriteChan.Put(&BufferFrame{Frame: frame, Buf: buf}) {
+			if buf != nil {
+				buf.Free()
+			}
 			t.logger.Debug("[Send] tunnel is closed, abort sending")
 			return core.ErrTunnelClosed
 		}
-		t.logger.Debug("[Send] Put frame in write chan")
 		return nil
 	}
 
@@ -75,25 +77,29 @@ func (t *TunnelNode) tunnelReader() {
 	for {
 		select {
 		case <-t.done:
+			t.logger.Info("[tunnelReader] Get done signal, exit")
 			return
 		default:
 		}
-		frame, err := ReadFrameFromConnection(t.remoteTunnelNode, t.framer)
+		frameBuf, frame, err := ReadFrameFromConnection(t.remoteTunnelNode, t.framer)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				t.logger.Warning("[tunnelReader] Close tunel reader: (" + err.Error() + ")")
-				t.Stop() // TODO проверить нужен ли
+				t.Stop()
 			} else {
 				t.logger.Error("[tunnelReader] ERROR in read frame: " + err.Error())
 				t.Stop()
 			}
+			if frameBuf != nil {
+				frameBuf.Free()
+			}
 			return
 		}
-		if !t.tunnelReadChan.Put(frame) {
+		if !t.tunnelReadChan.Put(&BufferFrame{Frame: frame, Buf: frameBuf}) {
 			t.logger.Debug("[tunnelReader] tunnel is closed or writeChan is full, exit reader")
+			frameBuf.Free()
 			return
 		}
-		t.logger.Debug("[tunnelReader] Put frame in read chan")
 	}
 }
 
@@ -102,30 +108,35 @@ func (t *TunnelNode) tunnelWriter() {
 	for {
 		select {
 		case <-t.done:
-			t.logger.Debug("[tunnelWriter] Tunnel is close, exit")
+			t.logger.Debug("[tunnelWriter] Get done signal, exit")
 			return
-		case frame := <-t.tunnelWriteChan.GetChannel():
+		case <-t.tunnelReadChan.done:
+			t.logger.Debug("[tunnelWriter] Read cheannel is close, exit")
+			return
+		case bufFrame := <-t.tunnelWriteChan.GetChannel():
 			t.connMut.Lock()
 			if t.remoteTunnelNode == nil {
 				t.logger.Debug("[tunnelWriter] remoteTunnelNode is nil, exit")
 				t.connMut.Unlock()
+				bufFrame.Buf.Free()
 				return
 			}
-			_, err := t.remoteTunnelNode.Write(frame) // TODO мб через done
+			_, err := t.remoteTunnelNode.Write(bufFrame.Frame) // TODO добавить WriteDeadline
 			t.connMut.Unlock()
+			bufFrame.Buf.Free()
 			if err != nil {
 				t.logger.Error("[tunnelWriter] Error in send data: " + err.Error())
-				continue
+				t.Stop()
+				return
 			}
-			t.logger.Debug("[tunnelChanReader] Data has been sent")
 		}
 	}
 }
 
 func NewTunnelNode(remoteConn net.Conn, framer core.Framer) *TunnelNode {
 	node := &TunnelNode{
-		tunnelReadChan:   NewSafeChannel(),
-		tunnelWriteChan:  NewSafeChannel(),
+		tunnelReadChan:   NewSafeBufferChannel(),
+		tunnelWriteChan:  NewSafeBufferChannel(),
 		remoteTunnelNode: remoteConn,
 		framer:           framer,
 		isRunning:        true,
@@ -135,51 +146,4 @@ func NewTunnelNode(remoteConn net.Conn, framer core.Framer) *TunnelNode {
 	go node.tunnelReader()
 	go node.tunnelWriter()
 	return node
-}
-
-// CHAN-HELP
-
-type SafeChannel struct {
-	channel chan []byte
-	isOpen  bool
-	done    chan struct{}
-	once    sync.Once
-}
-
-func (s *SafeChannel) Put(data []byte) bool {
-	select {
-	case <-s.done:
-		return false
-	case s.channel <- data:
-		return true
-	case <-time.After(time.Second * 5):
-		return false
-	}
-}
-
-func (s *SafeChannel) IsOpen() bool {
-	return s.isOpen
-}
-
-func (s *SafeChannel) Done() chan struct{} {
-	return s.done
-}
-
-func (s *SafeChannel) GetChannel() chan []byte {
-	return s.channel
-}
-
-func (s *SafeChannel) Close() {
-	s.once.Do(func() {
-		close(s.done)
-		s.isOpen = false
-	})
-}
-
-func NewSafeChannel() *SafeChannel {
-	return &SafeChannel{
-		channel: make(chan []byte, 1000),
-		isOpen:  true,
-		done:    make(chan struct{}),
-	}
 }

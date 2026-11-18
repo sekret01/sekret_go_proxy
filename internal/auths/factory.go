@@ -1,14 +1,12 @@
 package auths
 
 import (
-	"fmt"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
-type factoryFunc func(config *config.Config, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error)
+type factoryFunc func(ctxGenerator core.HandshakeContextGenerator) (core.Auth, error)
 
 var (
 	authMap = make(map[string]factoryFunc)
@@ -22,7 +20,6 @@ func Reigstrate(key string, factory factoryFunc) {
 		panic("Auth module [" + key + "] already exists")
 	}
 	authMap[key] = factory
-	fmt.Printf("Auth [%s] has been registrated\n", key)
 }
 
 func get(key string) (factoryFunc, error) {
@@ -35,12 +32,12 @@ func get(key string) (factoryFunc, error) {
 	return encr, nil
 }
 
-func NewAuth(config *config.Config, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error) {
-	factory, err := get(config.AuthType)
+func NewAuth(authType string, ctxGenerator core.HandshakeContextGenerator) (core.Auth, error) {
+	factory, err := get(authType)
 	if err != nil {
 		return nil, err
 	}
-	return factory(config, ctxGenerator)
+	return factory(ctxGenerator)
 }
 
 func List() []string {

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
+	"github.com/sekret01/sekret_go_proxy/internal/buffers"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -27,18 +27,24 @@ type TunnelEngine struct {
 	bootstrap  core.Bootstrap
 
 	remoteAddr string // Адрес удаленного узла для подключения
+	encType    string
 
 	logger          logger.Logger
 	mutex           sync.Mutex
 	clientListeners []ClientListener
-	tunnelMessages  chan core.MessageData
+	tunnelMessages  chan *core.MessageData
 
 	status *proxy.TunnelStatus // Состояние работы
 	ctx    *core.HandshakeContext
-	cfg    *config.Config
+	done   chan struct{}
+}
+
+func (t *TunnelEngine) Done() chan struct{} {
+	return t.done
 }
 
 func (t *TunnelEngine) ConnectToTunnel() error {
+	t.done = make(chan struct{})
 	t.status.SetLaunch()
 	conn, err := t.waitConnectionToTunnel()
 	if err != nil {
@@ -49,14 +55,14 @@ func (t *TunnelEngine) ConnectToTunnel() error {
 	t.logger.Info("[ConnectToTunnel] :: Try authenticate")
 	if err := t.authenticate(conn); err != nil {
 		t.status.SetStopped()
-		return nil
+		return err
 	}
 	t.logger.Info("[ConnectToTunnel] :: Auth success")
 	t.logger.Info("[ConnectToTunnel] :: Start configure moduls from server data")
 	if err := t.configureModuls(); err != nil {
 		t.logger.Error("[ConnectToTunnel] :: Configure fail: " + err.Error())
 		t.status.SetStopped()
-		return nil
+		return err
 	}
 	t.logger.Info("[ConnectToTunnel] :: Configure success")
 	t.status.SetRunning()
@@ -94,13 +100,18 @@ func (t *TunnelEngine) SetStopped() {
 }
 
 func (t *TunnelEngine) authenticate(conn net.Conn) error {
-	_, key, err := t.bootstrap.ClientBootstrap(conn)
-	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, key, t.cfg)
+	steps, key, err := t.bootstrap.ClientBootstrap(conn)
+	if err != nil {
+		t.logger.Warning("[authenticate] Bootstrap fail: " + err.Error())
+		return err
+	}
+	enc, err := encryptors.NewEncryptor(t.encType, key)
 	if err != nil {
 		t.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
 		return err
 	}
 	t.auth.SetEncryptor(enc)
+	t.auth.SetSteps(steps)
 	t.ctx, err = t.auth.ClientHandshake(conn)
 	if err != nil {
 		t.logger.Error("[authenticate] ClientHandshake error: " + err.Error())
@@ -110,7 +121,7 @@ func (t *TunnelEngine) authenticate(conn net.Conn) error {
 }
 
 func (t *TunnelEngine) configureModuls() error {
-	enc, err := encryptors.NewEncryptor(t.cfg.EncryptorType, []byte(t.ctx.EncryptorKey), t.cfg)
+	enc, err := encryptors.NewEncryptor(t.encType, []byte(t.ctx.EncryptorKey))
 	if err != nil {
 		return err
 	}
@@ -136,14 +147,16 @@ func (t *TunnelEngine) stopListening(stopRunning bool) error {
 		t.logger.Warning("[stopListening] Trying to stop stopped service, cencel")
 		return nil
 	}
+	t.logger.Debug("[stopListening] STOP LISTENING ACTIVATE")
 	if stopRunning {
 		t.status.SetStopped()
 	}
+	close(t.done)
 	t.sendCloseIntoTunnel(core.GetNoopID()) // TODO генерировать 1 раз вначале, хранить в структуре
-	t.tunnelNode.Stop()
+	if t.tunnelNode != nil {
+		t.tunnelNode.Stop()
+	}
 	t.closeListeners()
-	close(t.tunnelMessages)                              // TODO нужно ли
-	t.tunnelMessages = make(chan core.MessageData, 1000) // TODO нужно ли
 	t.logger.Info("[stopListening] Stop tunnel listening")
 	return nil
 }
@@ -166,19 +179,26 @@ func (t *TunnelEngine) tunnelReader() {
 				t.stopListening(false)
 			}
 			return
-		case frame := <-readChannel:
-			data, msgType, requestId, err := t.framer.Unframe(frame)
+		case tunBuf := <-readChannel:
+			frameBuf := buffers.GetBuf(len(tunBuf.Frame))
+			data, msgType, requestId, err := t.framer.UnframeTo(frameBuf.Bytes(), tunBuf.Frame)
 			if err != nil {
 				t.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
+				frameBuf.Free()
+				tunBuf.Buf.Free()
 				continue
 			}
-			decryptData := t.encryptor.Decrypt(data)
+			buf := buffers.GetBuf(len(data))
+			decryptData := t.encryptor.DecryptTo(buf.Bytes(), data)
+			frameBuf.Free()
+			tunBuf.Buf.Free()
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
 				Data:      decryptData,
+				Buf:       buf,
 			}
-			t.tunnelMessages <- frameData
+			t.tunnelMessages <- &frameData
 		}
 
 	}
@@ -189,14 +209,21 @@ func (t *TunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.Mes
 	if !t.status.IsRunning() || t.encryptor == nil {
 		return nil
 	}
-	t.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 100) + "]")
-	payloadEncode := t.encryptor.Encrypt([]byte(payload))
-	frame, err := t.framer.Frame(payloadEncode, msgType, requestId)
+	t.logger.Debugf(func() string {
+		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
+			"], msg: [" + utils.BytesToString(payload, 100) + "]"
+	})
+	encoderBuf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
+	payloadEncode := t.encryptor.EncryptTo(encoderBuf.Bytes(), []byte(payload))
+	frameBuf := buffers.GetBuf(len(payloadEncode) + t.framer.HeaderSize() + core.BYTE_16) // TODO аналогично, решить с длинной
+	frame, err := t.framer.FrameTo(frameBuf.Bytes(), payloadEncode, msgType, requestId)
+	encoderBuf.Free()
 	if err != nil {
 		t.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
+		frameBuf.Free()
 		return err
 	}
-	t.tunnelNode.Send(frame)
+	t.tunnelNode.Send(frame, frameBuf)
 	return nil
 }
 
@@ -214,10 +241,11 @@ func (t *TunnelEngine) closeListeners() {
 func NewTunnelEngine(
 	transport core.Transport,
 	framer core.Framer,
-	cfg *config.Config,
 	logger logger.Logger,
 	auth core.Auth,
 	bootstrap core.Bootstrap,
+	remoteAddr string,
+	encType string,
 ) *TunnelEngine {
 	engine := &TunnelEngine{
 		tunnelNode:      nil,
@@ -225,13 +253,14 @@ func NewTunnelEngine(
 		encryptor:       nil,
 		framer:          framer,
 		status:          proxy.NewTunnelStatus(),
-		remoteAddr:      cfg.RemoteHost,
+		remoteAddr:      remoteAddr,
+		encType:         encType,
 		logger:          logger,
 		clientListeners: make([]ClientListener, 0),
-		tunnelMessages:  make(chan core.MessageData, 1000),
+		tunnelMessages:  make(chan *core.MessageData, 1000),
 		auth:            auth,
 		bootstrap:       bootstrap,
-		cfg:             cfg,
+		done:            make(chan struct{}),
 	}
 	return engine
 }

@@ -2,27 +2,41 @@ package app
 
 import (
 	"github.com/sekret01/sekret_go_proxy/internal/auths"
+	"github.com/sekret01/sekret_go_proxy/internal/bootstrap"
 	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/detectors"
 	"github.com/sekret01/sekret_go_proxy/internal/dispatchers"
+	"github.com/sekret01/sekret_go_proxy/internal/dns"
+	"github.com/sekret01/sekret_go_proxy/internal/filters"
 	"github.com/sekret01/sekret_go_proxy/internal/framers"
-	"github.com/sekret01/sekret_go_proxy/internal/handshake"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy/client"
+	"github.com/sekret01/sekret_go_proxy/internal/proxy/server"
 	"github.com/sekret01/sekret_go_proxy/internal/transports"
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
 type ClientApp struct {
-	tunnel *client.ClientProxy
+	tunnel       *client.ClientProxy
+	filterServer *server.ServerProxy
+	dnsServer    *dns.DNSServer
 }
 
 func (p *ClientApp) Start() error {
+	if p.filterServer != nil {
+		p.filterServer.Start()
+	}
 	return p.tunnel.Start()
 }
 
 func (p *ClientApp) Stop() error {
+	if p.filterServer != nil {
+		p.filterServer.Stop()
+	}
+	if p.dnsServer != nil {
+		p.dnsServer.Stop()
+	}
 	return p.tunnel.Stop()
 }
 
@@ -45,43 +59,130 @@ func (p *ClientApp) GetLogs() []logger.LogMessage {
 func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 	buildSuccess := true
 
-	transport, err := transports.NewTransport(cfg)
+	transport, err := transports.NewTransport(cfg.TransportType)
 	buildSuccess = buildSuccess && isContinue(err)
-	framer, err := framers.NewFramer(cfg)
+	framer, err := framers.NewFramer(cfg.FramerType)
 	buildSuccess = buildSuccess && isContinue(err)
-	dispatcher, err := dispatchers.NewDispatcher(cfg)
+	dispatcher, err := dispatchers.NewDispatcher(cfg.DispatcherType)
 	buildSuccess = buildSuccess && isContinue(err)
 	ctxGenConnector := &core.HandshakeGeneratorConnector{}
-	auth, err := auths.NewAuth(cfg, ctxGenConnector)
+	auth, err := auths.NewAuth(cfg.AuthType, ctxGenConnector)
+	buildSuccess = buildSuccess && isContinue(err)
+	filterAuth, err := auths.NewAuth(cfg.AuthType, ctxGenConnector)
+	buildSuccess = buildSuccess && isContinue(err)
+	filter, err := filters.NewFilter(cfg.FilterType, cfg.FilterActive, cfg.FilterDomain, cfg.FilterAddresses)
 	buildSuccess = buildSuccess && isContinue(err)
 	detector := detectors.NewDetector()
-	bootstrap := handshake.NewBootstrap(*cfg)
+	filterBootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: cfg.HandshakeSteps})
+	buildSuccess = buildSuccess && isContinue(err)
+	mainBootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: cfg.HandshakeSteps})
+	buildSuccess = buildSuccess && isContinue(err)
+	ipMap := dns.NewIPDomainMap()
 
 	if !buildSuccess {
 		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
 		return nil, core.ErrBuildClientApp
 	}
 
+	var dnsServer *dns.DNSServer = nil
+	if cfg.DnsActive {
+		dnsServer = dns.NewDNSServer(
+			cfg.DnsHost,
+			cfg.DnsUpstream,
+			ipMap)
+		go func() {
+			err := dnsServer.Start()
+			if err != nil {
+				logger.GetLoggerHub().Warning("DNS server error, continue without it: " + err.Error())
+			}
+		}()
+	}
+
 	tunnelEngin := client.NewTunnelEngine(
 		transport,
 		framer,
-		cfg,
 		logger.GetLoggerHub().WithModule("TunnelEngine"),
 		auth,
-		bootstrap,
+		mainBootstrap,
+		cfg.RemoteHost,
+		cfg.EncryptorType,
+	)
+	filterTunnelEngin := client.NewTunnelEngine(
+		transport,
+		framer,
+		logger.GetLoggerHub().WithModule("TunnelEngine [Filter]"),
+		filterAuth,
+		filterBootstrap,
+		cfg.FilterServer.Host,
+		cfg.FilterServer.Encryptor,
 	)
 
 	tunnel := client.NewClientProxy(
 		tunnelEngin,
+		filterTunnelEngin,
+		filter,
 		detector,
 		dispatcher,
-		cfg,
+		cfg.LocalHost,
 		logger.GetLoggerHub().WithModule("ClientProxy"),
+		ipMap,
+		cfg.ConnLimit,
 	)
+
+	var filterServer *server.ServerProxy = nil
+	if cfg.FilterActive {
+		filterServer, err = NewFilterServerApp(&cfg.FilterServer)
+		if err != nil {
+			logger.GetLoggerHub().Error("Errors in building filterServer, continue without it")
+			cfg.FilterActive = false
+		}
+	}
 	ctxGenConnector.SubscribeGenerator(tunnel)
 	return &ClientApp{
-		tunnel: tunnel,
+		tunnel:       tunnel,
+		filterServer: filterServer,
+		dnsServer:    dnsServer,
 	}, nil
+}
+
+func NewFilterServerApp(cfg *config.FilterServerConfig) (*server.ServerProxy, error) {
+	buildSuccess := true
+
+	transport, err := transports.NewTransport(cfg.Transport)
+	buildSuccess = buildSuccess && isContinue(err)
+	framer, err := framers.NewFramer(cfg.Framer)
+	buildSuccess = buildSuccess && isContinue(err)
+	dispatcher, err := dispatchers.NewDispatcher(cfg.Dispatcher)
+	buildSuccess = buildSuccess && isContinue(err)
+	ctxGenConnector := &core.HandshakeGeneratorConnector{}
+	auth, err := auths.NewAuth(cfg.Auth, ctxGenConnector)
+	buildSuccess = buildSuccess && isContinue(err)
+	detector := detectors.NewDetector()
+	bootstrap, err := bootstrap.NewBootstrap("default", &bootstrap.BootstrapConfig{HandshakeSteps: []string{}})
+
+	if !buildSuccess {
+		logger.GetLoggerHub().Error("Errors in building moduls, stop program")
+		return nil, core.ErrBuildServerApp
+	}
+
+	serverTunnelEngine := server.NewServerTunnelEngine(
+		transport,
+		framer,
+		bootstrap,
+		auth,
+		cfg.Host,
+		cfg.Encryptor,
+		logger.GetLoggerHub().WithModule("ServerTunnelEngine [Filter]"),
+	)
+
+	proxy := server.NewServerProxy(
+		serverTunnelEngine,
+		dispatcher,
+		detector,
+		logger.GetLoggerHub().WithModule("ServerProxy [Filter]"),
+	)
+	ctxGenConnector.SubscribeGenerator(proxy)
+	return proxy, nil
 }
 
 func isContinue(err error) bool {

@@ -5,6 +5,8 @@ package core
 type Framer interface {
 	Frame(data []byte, messageType MessageType, requestId RequestID) ([]byte, error)
 	Unframe(data []byte) ([]byte, MessageType, RequestID, error)
+	FrameTo(dst, data []byte, messageType MessageType, requestId RequestID) ([]byte, error)
+	UnframeTo(dst, data []byte) ([]byte, MessageType, RequestID, error)
 	HeaderSize() int
 	GetPayloadSize(data []byte) (int, error)
 }

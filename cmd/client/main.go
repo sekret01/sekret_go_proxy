@@ -23,7 +23,6 @@ import (
 )
 
 func main() {
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -33,6 +32,7 @@ func main() {
 	hub.Info("START LOAD CONFIG")
 	cfg := loadConfig(hub)
 	setLoggerConfig(hub, cfg)
+	utils.RunPprof(cfg.PprofHost)
 
 	printRegistrates(hub)
 
@@ -53,7 +53,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	hub.Info("shutdown signal")
+	hub.Info("SHUTDOWN SIGNAL")
 	admin.Stop(ctx)
 }
 
@@ -90,7 +90,7 @@ func setLoggerConfig(hub logger.LoggerHub, cfg *config.Config) {
 	case logger.CriticalStr:
 		hub.SetLevel(logger.CRITICAL)
 	default:
-		hub.Critical("Unknown log_level in configs: " + cfg.LoggerLevel)
+		hub.Critical("[setLoggerConfig] Unknown log_level in configs: " + cfg.LoggerLevel)
 		criticalExit()
 	}
 }
@@ -109,7 +109,7 @@ func buildServerApp(hub logger.LoggerHub, cfg *config.Config) (webadmin.Controll
 func builClientProxyApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientApp {
 	client, err := app.NewClientApp(cfg)
 	if err != nil {
-		hub.Critical("[loadConfig]: " + err.Error())
+		hub.Critical("[builClientProxyApp]: " + err.Error())
 		criticalExit()
 	}
 	return client
@@ -118,7 +118,7 @@ func builClientProxyApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientApp
 func builClientTunApp(hub logger.LoggerHub, cfg *config.Config) *app.ClientTunApp {
 	client, err := app.NewClientTunApp(cfg)
 	if err != nil {
-		hub.Critical("[loadConfig]: " + err.Error())
+		hub.Critical("[builClientTunApp]: " + err.Error())
 		criticalExit()
 	}
 	return client

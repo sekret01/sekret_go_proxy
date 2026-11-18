@@ -20,7 +20,7 @@ func NewIPPool(subnet string) *IpPool {
 	// Генерируем все адреса кроме network, broadcast и .1 (сервер)
 	pool := &IpPool{used: make(map[string]bool)}
 	ip := ipnet.IP.To4()
-	for i := 2; i < 255; i++ { // .2 .. .254
+	for i := 2; i < 255; i++ {
 		a := make(net.IP, 4)
 		copy(a, ip)
 		a[3] = byte(i)

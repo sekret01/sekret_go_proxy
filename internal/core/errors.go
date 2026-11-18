@@ -2,16 +2,18 @@ package core
 
 import "errors"
 
-// Кастомные ошибки
 var (
 	ErrInvalidMagic = errors.New("Invalid magic bytes")
 
-	ErrInvalidEncryptKey    = errors.New("Encryptor with key not found")
-	ErrInvalidTransportKey  = errors.New("Transport with key not found")
-	ErrInvalidFramerKey     = errors.New("Framer with key not found")
-	ErrInvalidDispatcherKey = errors.New("Dispatcher with key not found")
-	ErrInvalidAuthKey       = errors.New("Auth module with key not found")
-	ErrOsTypeNotSupported   = errors.New("packetDevice for os is not supported")
+	ErrInvalidEncryptKey       = errors.New("Encryptor with key not found")
+	ErrInvalidTransportKey     = errors.New("Transport with key not found")
+	ErrInvalidFramerKey        = errors.New("Framer with key not found")
+	ErrInvalidDispatcherKey    = errors.New("Dispatcher with key not found")
+	ErrInvalidAuthKey          = errors.New("Auth module with key not found")
+	ErrInvalidFilterKey        = errors.New("Filter with key not found")
+	ErrInvalidHandshakeStepKey = errors.New("HandshakeStep module with key not found")
+	ErrInvalidBootstrapKey     = errors.New("Bootstrap module with key not found")
+	ErrOsTypeNotSupported      = errors.New("packetDevice for os is not supported")
 
 	ErrBuildClientApp = errors.New("Error building ClientApp modules")
 	ErrBuildServerApp = errors.New("Error building ServerApp modules")
@@ -22,7 +24,8 @@ var (
 
 	ErrAythFailed = errors.New("Authentication failed")
 
-	ErrAppNotRunning = errors.New("App is not running now")
+	ErrAppNotRunning             = errors.New("App is not running now")
+	ErrEncorrectHandshakeContext = errors.New("Handshake context is nil or empty. but must not to be")
 
 	ErrTunnelClosed = errors.New("Tunnel is closed")
 )

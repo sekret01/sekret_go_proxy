@@ -4,7 +4,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
 	"github.com/sekret01/sekret_go_proxy/internal/utils"
@@ -26,7 +25,7 @@ type ServerTun struct {
 	ipToSession   map[string]*vpnSession
 	nodeToSession map[*proxy.TunnelNode]*vpnSession
 	mu            sync.Mutex
-	once          sync.Once
+	once          *sync.Once
 
 	done chan struct{}
 }
@@ -36,6 +35,8 @@ func (s *ServerTun) Start() error {
 		s.logger.Warning("[Start] Trying to start running service, return")
 		return nil
 	}
+	s.done = make(chan struct{})
+	s.once = &sync.Once{}
 	s.tunnelEngine.SetLaunch()
 	s.packetDevice.ServerClose()
 	if err := s.packetDevice.CreateTun("tun0"); err != nil {
@@ -60,7 +61,7 @@ func (s *ServerTun) Start() error {
 }
 
 func (s *ServerTun) NewHandshakeContext() *core.HandshakeContext {
-	ctx := &core.HandshakeContext{} // TODO добавить генерацию 32b ключа
+	ctx := &core.HandshakeContext{}
 	clientIp, err := s.ipPool.Allocate()
 	if err != nil {
 		return nil
@@ -113,6 +114,7 @@ func (s *ServerTun) TunnelNodeHandler(tunWrapper *TunnelNodeWrapper) {
 			case core.MsgClose:
 				s.releaseSession(tunWrapper.Node())
 			}
+			msg.Buf.Free()
 		}
 	}
 }
@@ -157,7 +159,9 @@ func (s *ServerTun) tunReader() {
 			continue
 		}
 		data := buf[:n]
-		s.logger.Debug("[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20))
+		s.logger.Debugf(func() string {
+			return "[tunReader] get [" + utils.IntToString(n) + "] bytes: " + utils.BytesToString(data, 20)
+		})
 		dstIp, ok := extractDstIPv4(data)
 		if !ok {
 			s.logger.Debug("[tunReader] Cannot get IP from packet: " + string(dstIp))
@@ -217,17 +221,18 @@ func NewServerTun(
 	tunnelEngine *ServerTunnelEngine,
 	packetDevice core.PacketDevice,
 	logger logger.Logger,
-	cfg *config.Config,
+	subnet string,
 ) *ServerTun {
 	return &ServerTun{
 		tunnelEngine: tunnelEngine,
 		packetDevice: packetDevice,
 		logger:       logger,
 
-		ipPool:        NewIPPool(cfg.VPN.Subnet),
+		ipPool:        NewIPPool(subnet),
 		ipToSession:   make(map[string]*vpnSession),
 		nodeToSession: make(map[*proxy.TunnelNode]*vpnSession),
 		done:          make(chan struct{}),
+		once:          &sync.Once{},
 	}
 }
 

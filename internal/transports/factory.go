@@ -1,10 +1,8 @@
 package transports
 
 import (
-	"fmt"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 )
 
@@ -22,7 +20,6 @@ func Registrate(key string, factory FactoryFunc) {
 		panic("Transport [" + key + "] already exists")
 	}
 	transportsMap[key] = factory
-	fmt.Printf("Transport [%s] has been registrated\n", key)
 }
 
 func List() []string {
@@ -43,8 +40,8 @@ func get(key string) (FactoryFunc, error) {
 	return val, nil
 }
 
-func NewTransport(cfg *config.Config) (core.Transport, error) {
-	factory, err := get(cfg.TransportType)
+func NewTransport(name string) (core.Transport, error) {
+	factory, err := get(name)
 	if err != nil {
 		return nil, err
 	}

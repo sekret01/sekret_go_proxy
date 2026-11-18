@@ -4,7 +4,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/sekret01/sekret_go_proxy/internal/config"
+	"github.com/sekret01/sekret_go_proxy/internal/buffers"
 	"github.com/sekret01/sekret_go_proxy/internal/core"
 	"github.com/sekret01/sekret_go_proxy/internal/encryptors"
 	"github.com/sekret01/sekret_go_proxy/internal/proxy"
@@ -61,17 +61,20 @@ type ServerTunnelEngine struct {
 	tunnelsChannel chan *TunnelNodeWrapper
 
 	localAddr    string
+	encType      string
 	mainListener net.Listener
 	connMutex    sync.Mutex
 	chanMutex    sync.RWMutex
 
 	logger logger.Logger
 	status *proxy.TunnelStatus
-	cfg    *config.Config
+	done   chan struct{}
 }
 
 func (s *ServerTunnelEngine) RunTunnel() error {
 	s.status.SetLaunch()
+	s.tunnelsChannel = make(chan *TunnelNodeWrapper, 100)
+	s.done = make(chan struct{})
 	listener, err := s.transport.Listen(s.localAddr)
 	s.logger.Info("Start listen on " + s.localAddr)
 	if err != nil {
@@ -90,6 +93,8 @@ func (s *ServerTunnelEngine) StopListening() error {
 		return nil
 	}
 	s.status.SetStopped()
+	close(s.done)
+	close(s.tunnelsChannel)
 	s.connMutex.Lock()
 	for soket, tunNode := range s.tunnelNodesMap {
 		tunNode.Node().Stop()
@@ -116,7 +121,7 @@ func (s *ServerTunnelEngine) GetTunnelNodeWrapperForIp(ip string) *TunnelNodeWra
 func (s *ServerTunnelEngine) GetConnectedIps() []string {
 	s.connMutex.Lock()
 	res := []string{}
-	for ip, _ := range s.tunnelNodesMap {
+	for ip := range s.tunnelNodesMap {
 		res = append(res, ip)
 	}
 	s.connMutex.Unlock()
@@ -144,14 +149,20 @@ func (s *ServerTunnelEngine) SetStopped() {
 }
 
 func (s *ServerTunnelEngine) authenticate(conn net.Conn) (*core.HandshakeContext, error) {
-	_, key, err := s.bootstrap.ServerBootstrap(conn)
-	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, key, s.cfg)
+	steps, key, err := s.bootstrap.ServerBootstrap(conn)
+	if err != nil {
+		s.logger.Warning("[authenticate] Bootstrap fail: " + err.Error())
+		conn.Close()
+		return nil, err
+	}
+	enc, err := encryptors.NewEncryptor(s.encType, key)
 	if err != nil {
 		s.logger.Warning("[authenticate] Bootstrap encoder create error: " + err.Error())
 		conn.Close()
 		return nil, err
 	}
 	s.auth.SetEncryptor(enc)
+	s.auth.SetSteps(steps)
 	ctx, err := s.auth.ServerHandshake(conn)
 	if err != nil {
 		s.logger.Warning("[authenticate] Handshake error: " + err.Error())
@@ -176,7 +187,7 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 		s.logger.Info("[listenConnectoins] Start auth [" + con.RemoteAddr().String() + "]")
 		ctx, err := s.authenticate(con)
 		if err != nil {
-			s.logger.Warning("[listenConnectoins] Auth [" + con.RemoteAddr().String() + "] fail :" + err.Error())
+			s.logger.Warning("[listenConnectoins] Auth [" + con.RemoteAddr().String() + "] fail: " + err.Error())
 			con.Close()
 			continue
 		}
@@ -192,17 +203,30 @@ func (s *ServerTunnelEngine) listenConnectoins() error {
 		s.connMutex.Lock()
 		s.tunnelNodesMap[tunNodeWrapper.ip] = tunNodeWrapper
 		s.connMutex.Unlock()
-		s.tunnelsChannel <- tunNodeWrapper
+		if ok := s.putTunnelInChannel(tunNodeWrapper); !ok {
+			s.logger.Debug("[listenConnectoins] Cannot put connection in chan, skip: " + tunNodeWrapper.ip)
+			continue
+		}
 		s.logger.Debug("[listenConnectoins] New connection: " + tunNodeWrapper.ip)
 		go s.tunnelReader(tunNodeWrapper.ip, tunNodeWrapper, tunNodeWrapper.msgChannel)
 	}
+}
+
+func (s *ServerTunnelEngine) putTunnelInChannel(tunNodeWrapper *TunnelNodeWrapper) bool {
+	select {
+	case <-s.done:
+		return false
+	case s.tunnelsChannel <- tunNodeWrapper:
+		return true
+	}
+
 }
 
 func (s *ServerTunnelEngine) configureTunNodeWrapper(con net.Conn, ctx *core.HandshakeContext) (*TunnelNodeWrapper, error) {
 	tunnelNode := proxy.NewTunnelNode(con, s.framer)
 	msgChannel := make(chan core.MessageData, 1000)
 	ip := con.RemoteAddr().String()
-	enc, err := encryptors.NewEncryptor(s.cfg.EncryptorType, ctx.EncryptorKey, s.cfg)
+	enc, err := encryptors.NewEncryptor(s.encType, ctx.EncryptorKey)
 	if err != nil {
 		return nil, err
 	}
@@ -221,20 +245,28 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 			delete(s.tunnelNodesMap, ip)
 			s.connMutex.Unlock()
 			return
-		case frame := <-tunnelNodeWrapper.Node().GetReadChan().GetChannel():
-			data, msgType, requestId, err := s.framer.Unframe(frame)
+		case tunBuf := <-tunnelNodeWrapper.Node().GetReadChan().GetChannel():
+			frameBuf := buffers.GetBuf(len(tunBuf.Frame))
+			data, msgType, requestId, err := s.framer.UnframeTo(frameBuf.Bytes(), tunBuf.Frame)
 			if err != nil {
 				s.logger.Error("[tunnelReader] ERROR: unframe: " + err.Error())
+				frameBuf.Free()
+				tunBuf.Buf.Free()
 				continue
 			}
-			decryptData := tunnelNodeWrapper.Moduls.Encryptor.Decrypt(data)
+			buf := buffers.GetBuf(len(data))
+			decryptData := tunnelNodeWrapper.Moduls.Encryptor.DecryptTo(buf.Bytes(), data)
+			frameBuf.Free()
+			tunBuf.Buf.Free()
 			frameData := core.MessageData{
 				MsgType:   msgType,
 				RequestId: requestId,
 				Data:      decryptData,
+				Buf:       buf,
 			}
 			select {
 			case <-tunnelNodeWrapper.Node().Done():
+				buf.Free()
 			default:
 				msgChannel <- frameData
 			}
@@ -243,14 +275,21 @@ func (s *ServerTunnelEngine) tunnelReader(ip string, tunnelNodeWrapper *TunnelNo
 }
 
 func (s *ServerTunnelEngine) sendIntoTunnel(requestId core.RequestID, msgType core.MessageType, payload []byte, tunnelNodeWrapper *TunnelNodeWrapper) error {
-	s.logger.Debug("[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) + "], msg: [" + utils.BytesToString(payload, 20) + "]")
-	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.Encrypt([]byte(payload))
-	frame, err := s.framer.Frame(payloadEncode, msgType, requestId)
+	s.logger.Debugf(func() string {
+		return "[sendIntoTunnel] Prepeare new msg: requestId: [" + utils.RequestIdToString(requestId) + "], msgType: [" + utils.MessageTypeToHexString(msgType) +
+			"], msg: [" + utils.BytesToString(payload, 20) + "]"
+	})
+	encodeBuf := buffers.GetBuf(len(payload) + core.BYTE_32) // TODO определять по Encryptor, там длина больше чем исходный payload
+	payloadEncode := tunnelNodeWrapper.Moduls.Encryptor.EncryptTo(encodeBuf.Bytes(), payload)
+	frameBuf := buffers.GetBuf(len(payloadEncode) + s.framer.HeaderSize() + core.BYTE_16) // TODO аналогично, решить с длинной
+	frame, err := s.framer.FrameTo(frameBuf.Bytes(), payloadEncode, msgType, requestId)
+	encodeBuf.Free()
 	if err != nil {
 		s.logger.Error("[sendIntoTunnel] Error in send data: " + err.Error())
+		frameBuf.Free()
 		return err
 	}
-	tunnelNodeWrapper.Node().Send(frame)
+	tunnelNodeWrapper.Node().Send(frame, frameBuf)
 	return nil
 }
 
@@ -266,7 +305,8 @@ func NewServerTunnelEngine(
 	framer core.Framer,
 	bootstrap core.Bootstrap,
 	auth core.Auth,
-	cfg *config.Config,
+	localAddr string,
+	encType string,
 	logger logger.Logger,
 ) *ServerTunnelEngine {
 	engine := &ServerTunnelEngine{
@@ -276,11 +316,12 @@ func NewServerTunnelEngine(
 		auth:           auth,
 		tunnelNodesMap: make(map[string]*TunnelNodeWrapper, 100),
 		tunnelsChannel: make(chan *TunnelNodeWrapper, 100),
-		localAddr:      cfg.LocalHost,
+		localAddr:      localAddr,
+		encType:        encType,
 		mainListener:   nil,
 		logger:         logger,
 		status:         proxy.NewTunnelStatus(),
-		cfg:            cfg,
+		done:           nil,
 	}
 	return engine
 }
