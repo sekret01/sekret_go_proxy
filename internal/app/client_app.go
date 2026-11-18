@@ -126,6 +126,7 @@ func NewClientApp(cfg *config.Config) (*ClientApp, error) {
 		cfg.LocalHost,
 		logger.GetLoggerHub().WithModule("ClientProxy"),
 		ipMap,
+		cfg.ConnLimit,
 	)
 
 	var filterServer *server.ServerProxy = nil

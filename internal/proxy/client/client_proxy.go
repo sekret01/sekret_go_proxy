@@ -27,6 +27,8 @@ type ClientProxy struct {
 	logger             logger.Logger
 	listener           net.Listener // Слушатель внешних поключений
 	ipMAp              *clientDns.IPDomainMap
+	connSem            chan struct{}
+	connAttempts       int
 }
 
 func (c *ClientProxy) GetStatus() *proxy.TunnelStatus {
@@ -121,7 +123,23 @@ func (c *ClientProxy) connectionsListener(listener net.Listener) error {
 				return err
 			}
 		}
-		go c.newConnectionHandler(requestConn)
+		select {
+		case c.connSem <- struct{}{}:
+			go func() {
+				c.connAttempts = 0
+				defer func() { <-c.connSem }()
+				c.newConnectionHandler(requestConn)
+			}()
+		default:
+			c.connAttempts++
+			switch c.connAttempts {
+			case 100:
+				c.logger.Warning("[connectionsListener] Can not accept conn, limit reached (100+ consecutive attempts)")
+			case 1000:
+				c.logger.Critical("[connectionsListener] Can not accept conn, limit reached (1000+ consecutive attempts)")
+			}
+			requestConn.Close()
+		}
 	}
 	return nil
 }
@@ -134,6 +152,7 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 	}
 	c.logger.Debug("[newConnectionHandler] New connection: " + requestConn.RemoteAddr().String())
 
+	requestConn.SetDeadline(time.Now().Add(10 * time.Second))
 	reader := bufio.NewReader(requestConn)
 	data, err := reader.ReadString('\n')
 	if err != nil {
@@ -163,6 +182,7 @@ func (c *ClientProxy) newConnectionHandler(requestConn net.Conn) {
 		requestConn.Close()
 		return
 	}
+	requestConn.SetDeadline(time.Time{})
 	c.switchProtocol(proto, requestConn, reader)
 }
 
@@ -349,6 +369,7 @@ func NewClientProxy(
 	localAddr string,
 	logger logger.Logger,
 	ipMAp *clientDns.IPDomainMap,
+	connectionLimit int,
 ) *ClientProxy {
 	client := &ClientProxy{
 		mainTunnelEngine:   mainTunnelEngine,
@@ -360,6 +381,8 @@ func NewClientProxy(
 		logger:             logger,
 		listener:           nil,
 		ipMAp:              ipMAp,
+		connSem:            make(chan struct{}, connectionLimit),
+		connAttempts:       0,
 	}
 	mainTunnelEngine.RegistrateListener(client)
 	return client

@@ -3,6 +3,7 @@ connection:
   localhost: 127.0.0.1:15985
   remotehost: 
   pprofhost: 0.0.0.0:6060
+  connection_limit: 2048
 
 filter:
   active: true
