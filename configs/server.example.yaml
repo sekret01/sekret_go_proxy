@@ -1,8 +1,8 @@
 connection:
   connection_type: proxy
-  localhost: 127.0.0.1:15980
-  remotehost: 
-  pprofhost: 0.0.0.0:6060
+  localhost: :15980
+  remotehost: :15981
+  pprofhost: :6060
 
 modules:
   transport_type: tcp
@@ -16,7 +16,7 @@ logs:
   log_level: INFO
 
 admin:
-  adminhost: 127.0.0.1:12345
+  adminhost: :12345
   authentication: default
   user: test
   password: test

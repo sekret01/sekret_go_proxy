@@ -90,7 +90,7 @@ func ReadFrameFromConnection(serverTonnelConn net.Conn, framer core.Framer) (cor
 	if _, err := io.ReadFull(serverTonnelConn, header[:headerSize]); err != nil {
 		return nil, nil, err
 	}
-	payloadSize, err := framer.GetPayloadSize(header[:headerSize]) // bufHeader.Bytes()
+	payloadSize, err := framer.GetPayloadSize(header[:headerSize])
 	if err != nil {
 		return nil, nil, err
 	}

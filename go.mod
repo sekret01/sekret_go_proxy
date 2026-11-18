@@ -4,6 +4,7 @@ go 1.26.5
 
 require (
 	fyne.io/fyne/v2 v2.8.1
+	github.com/miekg/dns v1.1.73
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sys v0.48.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -31,7 +32,6 @@ require (
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
 	github.com/kr/text v0.1.0 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
-	github.com/miekg/dns v1.1.73 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

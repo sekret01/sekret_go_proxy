@@ -1,8 +1,8 @@
 connection:
   connection_type: proxy
-  localhost: 127.0.0.1:15985
+  localhost: :15985
   remotehost: 
-  pprofhost: 0.0.0.0:6060
+  pprofhost: :6060
   connection_limit: 2048
 
 filter:
@@ -20,7 +20,7 @@ filter:
 
 dns:
   active: true
-  host: 0.0.0.0:5353
+  host: :5353
   upstream: 8.8.8.8:53
 
 modules:
@@ -34,7 +34,7 @@ logs:
   log_level: INFO
 
 admin:
-  adminhost: 127.0.0.1:12345
+  adminhost: :12345
   authentication: none
   user: 
   password: 

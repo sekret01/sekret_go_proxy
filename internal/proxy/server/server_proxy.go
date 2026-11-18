@@ -13,7 +13,7 @@ import (
 	"github.com/sekret01/sekret_go_proxy/pkg/logger"
 )
 
-type chanMap map[core.RequestID]*proxy.SafeMessageChannel // SafeChannel
+type chanMap map[core.RequestID]*proxy.SafeMessageChannel
 
 type ServerProxy struct {
 	tunnelEngine *ServerTunnelEngine

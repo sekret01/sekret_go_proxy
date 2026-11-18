@@ -283,7 +283,7 @@ func (c *ClientProxy) listenFromClientForTunnel(requestId core.RequestID, reques
 	defer c.dispatcher.Delete(requestId)
 
 	buf := make([]byte, 16*1024)
-	requestConn.SetDeadline(time.Now().Add(20 * time.Second)) // TODO check
+	requestConn.SetDeadline(time.Now().Add(20 * time.Second))
 	for c.mainTunnelEngine.IsRunning() {
 		size, err := requestConn.Read(buf)
 		if err != nil {
